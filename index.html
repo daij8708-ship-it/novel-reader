@@ -144,20 +144,56 @@
   .shelf-item .shelf-meta {
     font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;
   }
-  .shelf-del-countdown {
+
+  /* ===== Delete Confirm Modal ===== */
+  .delete-backdrop {
     display: none;
-    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-    background: #e53e3e; color: #fff;
-    min-width: 56px; padding: 6px 12px; border-radius: 20px;
-    font-size: 0.85em; font-weight: 700; text-align: center;
-    white-space: nowrap; pointer-events: none;
-    z-index: 2;
-    box-shadow: 0 2px 8px rgba(229,62,62,0.4);
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); z-index: 50;
+    justify-content: center; align-items: center;
+    opacity: 0; transition: opacity 0.2s;
   }
-  .shelf-item { position: relative; overflow: hidden; }
-  .shelf-item.deleting { background: rgba(229,62,62,0.08); }
-  .shelf-item.deleting .shelf-del-countdown { display: block; }
-  .shelf-item.deleting .shelf-info { opacity: 0.5; }
+  .delete-backdrop.visible { display: flex; opacity: 1; }
+
+  .delete-dialog {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px 28px 20px;
+    min-width: 280px; max-width: 90vw;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+    transition: background var(--transition);
+  }
+  .delete-dialog .dd-title {
+    font-size: 0.95em; color: var(--text-secondary); margin-bottom: 4px;
+  }
+  .delete-dialog .dd-name {
+    font-size: 1.05em; font-weight: 600; color: var(--text);
+    margin-bottom: 18px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 260px;
+  }
+  .delete-dialog .dd-btn {
+    display: inline-block;
+    background: #e53e3e; color: #fff;
+    border: none; border-radius: 24px;
+    padding: 12px 40px;
+    font-size: 1em; font-weight: 700;
+    cursor: pointer;
+    min-width: 160px;
+    transition: all 0.15s;
+    font-family: var(--font-sans);
+  }
+  .delete-dialog .dd-btn:active { background: #c53030; transform: scale(0.96); }
+  .delete-dialog .dd-cancel {
+    display: block; margin-top: 12px;
+    background: none; border: none;
+    color: var(--text-secondary); font-size: 0.85em;
+    cursor: pointer; font-family: var(--font-sans);
+    padding: 6px 16px;
+  }
+  .delete-dialog .dd-cancel:hover { color: var(--text); }
+
   .shelf-empty { padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 0.85em; }
 
   /* ===== Sidebar Backdrop (mobile) ===== */
@@ -483,6 +519,16 @@
 
 <!-- Backdrop overlay for mobile sidebar -->
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
+<!-- Delete confirm modal -->
+<div class="delete-backdrop" id="deleteBackdrop" onclick="cancelDelete()">
+  <div class="delete-dialog" onclick="event.stopPropagation()">
+    <div class="dd-title">确认删除这本书吗？</div>
+    <div class="dd-name" id="deleteBookName"></div>
+    <button class="dd-btn" id="deleteBtn" onmousedown="startDeleteCountdown()" ontouchstart="startDeleteCountdown()">长按此处 3 秒</button>
+    <button class="dd-cancel" onclick="cancelDelete()">取消</button>
+  </div>
+</div>
 
 <!-- Main -->
 <div class="main">
@@ -1046,78 +1092,113 @@ async function renderShelf() {
     return;
   }
 
-  var i = 0;
-  books.forEach(b => {
-    const div = document.createElement('div');
+  books.forEach(function(b) {
+    var div = document.createElement('div');
     div.className = 'shelf-item' + (b.id === currentFilePath ? ' current' : '');
-    const totalChars = (b.content || '').replace(/\s/g, '').length;
-    const wordCount = totalChars > 10000 ? (totalChars / 10000).toFixed(1) + '万字' : totalChars + '字';
-    const chapterInfo = b.chapter != null ? '读到第' + (b.chapter + 1) + '章' : '';
+    var totalChars = (b.content || '').replace(/\s/g, '').length;
+    var wordCount = totalChars > 10000 ? (totalChars / 10000).toFixed(1) + '万字' : totalChars + '字';
+    var chapterInfo = b.chapter != null ? '读到第' + (b.chapter + 1) + '章' : '';
     div.innerHTML =
       '<span class="shelf-info">' +
         '<div class="shelf-name">' + escapeHtml(b.id) + '</div>' +
         '<div class="shelf-meta">📊 ' + wordCount + (chapterInfo ? ' · 📍 ' + chapterInfo : '') + '</div>' +
-      '</span>' +
-      '<span class="shelf-del-countdown" id="countdown-' + i + '">删除 3</span>';
+      '</span>';
 
-    // Click to switch
-    div.onclick = function() { switchBook(b.id); };
-
-    // Long-press for delete
-    var pressTimer = null;
-    var countdownTimer = null;
-    var countdown = 3;
-    var countdownEl = null;
     var bookId = b.id;
+    var pressTimer = null;
 
-    function startCountdown() {
-      div.classList.add('deleting');
-      countdownEl = div.querySelector('.shelf-del-countdown');
-      countdown = 3;
-      countdownEl.textContent = '删除 ' + countdown;
-      countdownTimer = setInterval(function() {
-        countdown--;
-        if (countdown <= 0) {
-          clearInterval(countdownTimer);
-          countdownTimer = null;
-          div.classList.remove('deleting');
-          deleteBook(bookId);
-        } else {
-          countdownEl.textContent = '删除 ' + countdown;
-        }
-      }, 1000);
+    function onPressStart() {
+      pressTimer = setTimeout(function() {
+        // Long-press triggered: show delete modal
+        div.style.background = 'rgba(128,128,128,0.15)';
+        showDeleteModal(bookId);
+      }, 600);
     }
 
-    function cancelDelete() {
+    function onPressEnd() {
       clearTimeout(pressTimer);
       pressTimer = null;
-      if (countdownTimer) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-        div.classList.remove('deleting');
-        showToast('已取消删除');
-      }
     }
 
-    div.addEventListener('touchstart', function(e) {
-      pressTimer = setTimeout(startCountdown, 600); // 0.6s to trigger
-    }, { passive: true });
+    div.onclick = function() { switchBook(bookId); };
 
-    div.addEventListener('touchend', cancelDelete);
-    div.addEventListener('touchmove', cancelDelete);
-    div.addEventListener('touchcancel', cancelDelete);
-
-    // Also support mouse long-press on desktop
-    div.addEventListener('mousedown', function(e) {
-      if (e.button === 0) pressTimer = setTimeout(startCountdown, 600);
-    });
-    div.addEventListener('mouseup', cancelDelete);
-    div.addEventListener('mouseleave', cancelDelete);
+    div.addEventListener('touchstart', onPressStart, { passive: true });
+    div.addEventListener('touchend', onPressEnd);
+    div.addEventListener('touchmove', onPressEnd);
+    div.addEventListener('touchcancel', onPressEnd);
+    div.addEventListener('mousedown', function(e) { if (e.button === 0) onPressStart(); });
+    div.addEventListener('mouseup', onPressEnd);
+    div.addEventListener('mouseleave', onPressEnd);
 
     shelf.appendChild(div);
-    i++;
   });
 }
+
+// Store the shelf item currently being deleted so we can reset its style
+var pendingDeleteId = null;
+var pendingDeleteTimer = null;
+
+function showDeleteModal(id) {
+  pendingDeleteId = id;
+  document.getElementById('deleteBookName').textContent = id;
+  document.getElementById('deleteBtn').textContent = '长按此处 3 秒';
+  document.getElementById('deleteBackdrop').classList.add('visible');
+}
+
+function startDeleteCountdown() {
+  if (!pendingDeleteId) return;
+  var btn = document.getElementById('deleteBtn');
+  var countdown = 3;
+  btn.textContent = '删除 ' + countdown;
+  btn.style.background = '#e53e3e';
+  pendingDeleteTimer = setInterval(function() {
+    countdown--;
+    if (countdown <= 0) {
+      clearInterval(pendingDeleteTimer);
+      pendingDeleteTimer = null;
+      cancelDelete();
+      deleteBook(pendingDeleteId);
+      pendingDeleteId = null;
+    } else {
+      btn.textContent = '删除 ' + countdown;
+    }
+  }, 1000);
+}
+
+function cancelDelete() {
+  if (pendingDeleteTimer) {
+    clearInterval(pendingDeleteTimer);
+    pendingDeleteTimer = null;
+  }
+  document.getElementById('deleteBackdrop').classList.remove('visible');
+  // Reset shelf item gray
+  if (pendingDeleteId) {
+    var items = document.querySelectorAll('.shelf-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].style.background = '';
+    }
+  }
+  pendingDeleteId = null;
+}
+
+function cancelDeleteBtnHandlers() {
+  // Stop countdown on touchend/mouseup
+  if (pendingDeleteTimer) {
+    clearInterval(pendingDeleteTimer);
+    pendingDeleteTimer = null;
+    document.getElementById('deleteBtn').textContent = '长按此处 3 秒';
+    showToast('继续按住完成删除');
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('deleteBtn');
+  if (btn) {
+    btn.addEventListener('touchend', cancelDeleteBtnHandlers);
+    btn.addEventListener('mouseup', cancelDeleteBtnHandlers);
+    btn.addEventListener('mouseleave', cancelDeleteBtnHandlers);
+  }
+});
+
 
 async function switchBook(id) {
   if (id === currentFilePath && currentBook) return; // already reading this book
