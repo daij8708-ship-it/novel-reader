@@ -141,20 +141,20 @@
   .shelf-item .shelf-meta {
     font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;
   }
-  .shelf-item .shelf-del {
-    opacity: 0;
-    padding: 4px 8px;
-    border: none;
-    background: transparent;
-    color: #c55;
-    cursor: pointer;
-    font-size: 1em;
-    border-radius: 4px;
-    transition: all 0.15s;
-    flex-shrink: 0;
+  .shelf-del-countdown {
+    display: none;
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: #e53e3e; color: #fff;
+    min-width: 56px; padding: 6px 12px; border-radius: 20px;
+    font-size: 0.85em; font-weight: 700; text-align: center;
+    white-space: nowrap; pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(229,62,62,0.4);
   }
-  .shelf-item:hover .shelf-del { opacity: 0.7; }
-  .shelf-item .shelf-del:hover { opacity: 1; background: rgba(200,60,60,0.12); }
+  .shelf-item { position: relative; overflow: hidden; }
+  .shelf-item.deleting { background: rgba(229,62,62,0.08); }
+  .shelf-item.deleting .shelf-del-countdown { display: block; }
+  .shelf-item.deleting .shelf-info { opacity: 0.5; }
   .shelf-empty { padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 0.85em; }
 
   /* ===== Sidebar Backdrop (mobile) ===== */
@@ -1039,6 +1039,7 @@ async function renderShelf() {
     return;
   }
 
+  var i = 0;
   books.forEach(b => {
     const div = document.createElement('div');
     div.className = 'shelf-item' + (b.id === currentFilePath ? ' current' : '');
@@ -1050,17 +1051,64 @@ async function renderShelf() {
         '<div class="shelf-name">' + escapeHtml(b.id) + '</div>' +
         '<div class="shelf-meta">📊 ' + wordCount + (chapterInfo ? ' · 📍 ' + chapterInfo : '') + '</div>' +
       '</span>' +
-      '<button class="shelf-del" title="删除">✕</button>';
+      '<span class="shelf-del-countdown" id="countdown-' + i + '">删除 3</span>';
 
-    div.onclick = (e) => {
-      if (e.target.classList.contains('shelf-del')) return;
-      switchBook(b.id);
-    };
-    div.querySelector('.shelf-del').onclick = (e) => {
-      e.stopPropagation();
-      deleteBook(b.id);
-    };
+    // Click to switch
+    div.onclick = function() { switchBook(b.id); };
+
+    // Long-press for delete
+    var pressTimer = null;
+    var countdownTimer = null;
+    var countdown = 3;
+    var countdownEl = null;
+    var bookId = b.id;
+
+    function startCountdown() {
+      div.classList.add('deleting');
+      countdownEl = div.querySelector('.shelf-del-countdown');
+      countdown = 3;
+      countdownEl.textContent = '删除 ' + countdown;
+      countdownTimer = setInterval(function() {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          div.classList.remove('deleting');
+          deleteBook(bookId);
+        } else {
+          countdownEl.textContent = '删除 ' + countdown;
+        }
+      }, 1000);
+    }
+
+    function cancelDelete() {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+      if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+        div.classList.remove('deleting');
+        showToast('已取消删除');
+      }
+    }
+
+    div.addEventListener('touchstart', function(e) {
+      pressTimer = setTimeout(startCountdown, 600); // 0.6s to trigger
+    }, { passive: true });
+
+    div.addEventListener('touchend', cancelDelete);
+    div.addEventListener('touchmove', cancelDelete);
+    div.addEventListener('touchcancel', cancelDelete);
+
+    // Also support mouse long-press on desktop
+    div.addEventListener('mousedown', function(e) {
+      if (e.button === 0) pressTimer = setTimeout(startCountdown, 600);
+    });
+    div.addEventListener('mouseup', cancelDelete);
+    div.addEventListener('mouseleave', cancelDelete);
+
     shelf.appendChild(div);
+    i++;
   });
 }
 
@@ -1082,7 +1130,6 @@ async function switchBook(id) {
 }
 
 async function deleteBook(id) {
-  if (!confirm('确定要移除「' + id + '」吗？\n（不会删除你的原始文件）')) return;
   await dbDelete(id);
   if (id === currentFilePath) {
     // Currently reading this book — clear the reader
