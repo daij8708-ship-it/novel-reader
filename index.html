@@ -799,9 +799,8 @@ async function init() {
     if (saved && saved.content) {
       currentFilePath = pointer.id;
       currentBook = saved.content;
-      const restoreChapter = saved.chapter || 0;
+      currentChapter = saved.chapter || 0;
       renderBook();
-      jumpToChapter(restoreChapter, false);
       updateProgress();
       showToast('📖 已恢复上次阅读：' + pointer.id);
     } else {
