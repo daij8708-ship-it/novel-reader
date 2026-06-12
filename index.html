@@ -393,9 +393,12 @@
     padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     z-index: 15; gap: 8px;
     justify-content: space-between;
-    transition: background var(--transition);
+    transition: opacity 0.25s, transform 0.25s;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    opacity: 0; transform: translateY(100%);
+    pointer-events: none;
   }
+  .bottom-nav.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
   .bottom-nav button {
     flex: 1; padding: 10px 8px;
     border: 1px solid var(--border); border-radius: 8px;
@@ -523,6 +526,7 @@
     .toast { bottom: 100px; font-size: 0.82em; padding: 8px 18px; }
 
     .bottom-nav { display: flex; }
+    .reader-container { padding-bottom: 20px; }
   }
 
   /* ========== @media (small phone, <380px) ========== */
@@ -1045,6 +1049,7 @@ function jumpToChapter(idx, save = true) {
   renderChapter(idx);
   if (save) saveState();
   if (window.innerWidth <= 768) closeSidebar();
+  if (window.innerWidth <= 480) showBottomNav();
 }
 
 function prevChapter() {
@@ -1070,7 +1075,7 @@ function updateBottomNav() {
   } else {
     prevBtn.disabled = false;
     var prevTitle = chapters[currentChapter - 1] ? chapters[currentChapter - 1].title : '上一章';
-    prevBtn.textContent = '◀ ' + prevTitle;
+    prevBtn.textContent = '◀ ' + prevTitle.substring(0, 12);
   }
   if (currentChapter >= chapters.length - 1) {
     nextBtn.disabled = true;
@@ -1078,11 +1083,45 @@ function updateBottomNav() {
   } else {
     nextBtn.disabled = false;
     var nextTitle = chapters[currentChapter + 1] ? chapters[currentChapter + 1].title : '下一章';
-    nextBtn.textContent = nextTitle + ' ▶';
+    nextBtn.textContent = nextTitle.substring(0, 12) + ' ▶';
   }
-  // Show nav only on mobile
   nav.style.display = window.innerWidth <= 480 ? 'flex' : 'none';
 }
+
+// Tap to show bottom nav, scroll to hide
+var bottomNavTimer = null;
+function showBottomNav() {
+  var nav = document.getElementById('bottomNav');
+  if (!nav || window.innerWidth > 480) return;
+  nav.classList.add('visible');
+  clearTimeout(bottomNavTimer);
+  bottomNavTimer = setTimeout(function() { hideBottomNav(); }, 4000);
+}
+function hideBottomNav() {
+  var nav = document.getElementById('bottomNav');
+  if (nav) nav.classList.remove('visible');
+}
+readerContainer.addEventListener('click', function(e) {
+  if (!currentBook) return;
+  // Don't toggle when clicking nav buttons, chapter buttons, or toolbar
+  var tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'button' || tag === 'a' || tag === 'label' || tag === 'input') return;
+  if (e.target.closest && (e.target.closest('button') || e.target.closest('.chapter-nav'))) return;
+  var nav = document.getElementById('bottomNav');
+  if (!nav) return;
+  if (nav.classList.contains('visible')) {
+    hideBottomNav();
+  } else {
+    showBottomNav();
+  }
+});
+readerContainer.addEventListener('scroll', function() {
+  // Hide nav while actively scrolling
+  hideBottomNav();
+}, { passive: true });
+readerContainer.addEventListener('touchend', function() {
+  // Don't auto-hide immediately after scroll ends — let the click handler toggle
+});
 
 // ============ Progress ============
 function updateProgress() {
