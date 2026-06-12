@@ -614,38 +614,61 @@ function openDB() {
   });
 }
 async function dbSave(id, content, chapter) {
-  if (!hasDB) {
+  // Always save progress pointer first (lightweight, never fails)
+  localStorage.setItem('reader_lastBook', JSON.stringify({ id, chapter, time: Date.now() }));
+
+  // Try IndexedDB for full content
+  if (hasDB) {
     try {
-      var cutoff = content.substring(0, 500000);
-      localStorage.setItem('reader_book_' + id, JSON.stringify({ content: cutoff, chapter: chapter, time: Date.now() }));
-    } catch(e) {}
-    localStorage.setItem('reader_lastBook', JSON.stringify({ id, chapter, time: Date.now() }));
-    return;
+      var db = await openDB();
+      var tx = db.transaction('books', 'readwrite');
+      tx.objectStore('books').put({ id: id, content: content, chapter: chapter, time: Date.now() });
+      await new Promise(function(r) { tx.oncomplete = r; tx.onerror = r; });
+      db.close();
+      return;
+    } catch (e) {
+      console.warn('IndexedDB save failed, falling back to localStorage:', e);
+      hasDB = false;
+    }
   }
+
+  // Fallback: localStorage (truncates long books but saves progress + prefix)
   try {
-    const db = await openDB();
-    const tx = db.transaction('books', 'readwrite');
-    tx.objectStore('books').put({ id, content, chapter, time: Date.now() });
-    await new Promise(r => { tx.oncomplete = r; tx.onerror = r; });
-    db.close();
-    localStorage.setItem('reader_lastBook', JSON.stringify({ id, chapter, time: Date.now() }));
-  } catch (e) { console.warn('DB save error:', e); }
+    var maxLen = 400000;
+    var truncated = content.length > maxLen ? content.substring(0, maxLen) : content;
+    localStorage.setItem('reader_book_' + id, JSON.stringify({
+      content: truncated,
+      chapter: chapter,
+      time: Date.now(),
+      truncated: content.length > maxLen
+    }));
+  } catch (e) {
+    console.warn('localStorage save also failed:', e);
+  }
 }
 async function dbLoad(id) {
-  if (!hasDB) {
-    try { return JSON.parse(localStorage.getItem('reader_book_' + id) || 'null'); } catch(e) { return null; }
+  // Try IndexedDB first
+  if (hasDB) {
+    try {
+      var db = await openDB();
+      var tx = db.transaction('books', 'readonly');
+      var result = await new Promise(function(r) {
+        var req = tx.objectStore('books').get(id);
+        req.onsuccess = function() { r(req.result); };
+        req.onerror = function() { r(null); };
+      });
+      db.close();
+      if (result && result.content) return result;
+    } catch (e) { /* fall through to localStorage */ }
   }
+
+  // Try localStorage fallback
   try {
-    const db = await openDB();
-    const tx = db.transaction('books', 'readonly');
-    const result = await new Promise(r => {
-      const req = tx.objectStore('books').get(id);
-      req.onsuccess = () => r(req.result);
-      req.onerror = () => r(null);
-    });
-    db.close();
-    return result;
-  } catch (e) { return null; }
+    var d = JSON.parse(localStorage.getItem('reader_book_' + id) || 'null');
+    if (d && d.content) return d;
+  } catch (e) {}
+
+  return null;
 }
 async function dbListAll() {
   if (!hasDB) {
@@ -691,11 +714,16 @@ async function dbDelete(id) {
 async function init() {
   document.documentElement.setAttribute('data-theme', theme);
   btnTheme.textContent = theme === 'dark' ? '☀️' : '🌙';
+
+  var isMobile = window.innerWidth <= 480;
+  if (isMobile && !localStorage.getItem('reader_fontSize')) { fontSize = 17; }
+  if (isMobile && !localStorage.getItem('reader_width')) { readerWidth = Math.floor(window.innerWidth * 0.92); }
+
   reader.style.fontSize = fontSize + 'px';
   fontSizeLabel.textContent = fontSize + 'px';
   reader.style.setProperty('--reader-width', readerWidth + 'px');
   if (isMobile) reader.style.width = readerWidth + 'px';
-  widthLabel.textContent = readerWidth + 'px';
+  widthLabel.textContent = isMobile ? '自适应' : (readerWidth + 'px');
 
   // Render shelf
   await renderShelf();
