@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>📖 小说阅读器</title>
 <style>
   :root {
@@ -425,7 +428,7 @@
     .toolbar .font-size-group button { padding: 7px 6px; }
 
     .reader-container { padding: 16px 0 100px; }
-    .reader { max-width: var(--reader-width, 94vw); width: 94vw; font-size: 17px; line-height: 2.0; text-align: justify; padding: 0 2px; }
+    .reader { max-width: 94vw; width: var(--reader-width, 94vw); font-size: 17px; line-height: 2.0; text-align: justify; padding: 0 2px; }
     .reader h2 { font-size: 1.3em; margin: 24px 0 8px; }
     .reader h3 { font-size: 1.05em; margin: 16px 0 6px; }
     .reader p { text-indent: 1.8em; margin: 0.3em 0; }
@@ -448,7 +451,7 @@
     .sidebar { width: 78vw; min-width: 78vw; }
     .sidebar.hidden { transform: translateX(-78vw); min-width: 78vw; width: 78vw; pointer-events: none; }
     .toolbar button, .toolbar .btn-file { padding: 6px 5px; font-size: 0.65em; }
-    .reader { font-size: 16px; line-height: 1.95; width: 96vw; max-width: var(--reader-width, 96vw); }
+    .reader { font-size: 16px; line-height: 1.95; width: var(--reader-width, 96vw); max-width: 96vw; }
     .reader-container { padding: 12px 0 90px; }
   }
 </style>
@@ -645,6 +648,7 @@ async function init() {
   reader.style.fontSize = fontSize + 'px';
   fontSizeLabel.textContent = fontSize + 'px';
   reader.style.setProperty('--reader-width', readerWidth + 'px');
+  if (isMobile) reader.style.width = readerWidth + 'px';
   widthLabel.textContent = readerWidth + 'px';
 
   // Render shelf
@@ -964,6 +968,9 @@ function changeFontSize(delta) {
 function changeWidth(delta) {
   readerWidth = Math.max(400, Math.min(1200, readerWidth + delta));
   reader.style.setProperty('--reader-width', readerWidth + 'px');
+  if (window.innerWidth <= 480) {
+    reader.style.width = readerWidth + 'px';
+  }
   widthLabel.textContent = readerWidth + 'px';
   localStorage.setItem('reader_width', readerWidth);
 }
