@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📖 小说阅读器</title>
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --text: #3a3226;
+    --text-secondary: #8b7e6a;
+    --accent: #b8753e;
+    --accent-light: #d4956a;
+    --card-bg: #fdfaf5;
+    --border: #e0d5c1;
+    --shadow: 0 2px 16px rgba(60, 40, 20, 0.08);
+    --sidebar-bg: #ede4d5;
+    --hover-bg: #f0e8d8;
+    --active-bg: #e4d4b8;
+    --font-serif: 'Georgia', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', 'STSong', serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  [data-theme="dark"] {
+    --bg: #1a1a1a;
+    --text: #d4cfc4;
+    --text-secondary: #8a8578;
+    --accent: #c8956c;
+    --accent-light: #d4a882;
+    --card-bg: #242424;
+    --border: #3a3530;
+    --shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+    --sidebar-bg: #1e1e1e;
+    --hover-bg: #2a2a2a;
+    --active-bg: #333028;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  /* ========== Sidebar ========== */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: transform var(--transition), background var(--transition);
+    z-index: 10;
+  }
+  .sidebar.hidden { transform: translateX(-280px); min-width: 0; width: 0; }
+
+  .sidebar-header {
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sidebar-header .logo { font-size: 1.4em; }
+  .sidebar-header h1 { font-size: 1.1em; font-weight: 600; white-space: nowrap; }
+
+  .book-info {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .book-info .title { font-size: 1em; color: var(--text); font-weight: 600; margin-bottom: 4px; }
+  .book-info .meta { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  /* ===== Sidebar Tabs ===== */
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-tabs button {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .sidebar-tabs button:hover { color: var(--text); }
+  .sidebar-tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ===== Shelf ===== */
+  .shelf { display: none; flex: 1; overflow-y: auto; padding: 4px 0; }
+  .shelf.visible { display: block; }
+  .shelf::-webkit-scrollbar { width: 4px; }
+  .shelf::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .shelf-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.83em;
+    cursor: pointer;
+    transition: background 0.12s;
+    font-family: var(--font-sans);
+    line-height: 1.4;
+    border-left: 3px solid transparent;
+    border-radius: 0;
+  }
+  .shelf-item:hover { background: var(--hover-bg); }
+  .shelf-item.current {
+    background: var(--active-bg);
+    border-left-color: var(--accent);
+    font-weight: 600;
+  }
+  .shelf-item .shelf-info { flex: 1; min-width: 0; }
+  .shelf-item .shelf-name {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .shelf-item .shelf-meta {
+    font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;
+  }
+  .shelf-item .shelf-del {
+    opacity: 0;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: #c55;
+    cursor: pointer;
+    font-size: 1em;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .shelf-item:hover .shelf-del { opacity: 0.7; }
+  .shelf-item .shelf-del:hover { opacity: 1; background: rgba(200,60,60,0.12); }
+  .shelf-empty { padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 0.85em; }
+
+  .toc {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .toc::-webkit-scrollbar { width: 4px; }
+  .toc::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .toc-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.88em;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: var(--font-sans);
+    line-height: 1.4;
+    border-left: 3px solid transparent;
+  }
+  .toc-item:hover { background: var(--hover-bg); }
+  .toc-item.active {
+    background: var(--active-bg);
+    border-left-color: var(--accent);
+    font-weight: 600;
+  }
+  .toc-item .chapter-num {
+    display: inline-block;
+    color: var(--accent);
+    margin-right: 6px;
+    font-size: 0.8em;
+    min-width: 24px;
+  }
+
+  /* ========== Main ========== */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card-bg);
+    flex-wrap: wrap;
+    transition: background var(--transition);
+  }
+
+  .toolbar button, .toolbar .btn-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.83em;
+    font-family: var(--font-sans);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .toolbar button:hover, .toolbar .btn-file:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent);
+  }
+  .toolbar button.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .toolbar .spacer { flex: 1; }
+
+  .toolbar .font-size-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .toolbar .font-size-label {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    min-width: 36px;
+    text-align: center;
+  }
+
+  .toolbar .progress-text {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    margin: 0 8px;
+  }
+
+  /* ========== Reader Area ========== */
+  .reader-container {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px 80px;
+  }
+  .reader-container::-webkit-scrollbar { width: 6px; }
+  .reader-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+
+  .reader {
+    --reader-width: 720px;
+    max-width: var(--reader-width);
+    width: 100%;
+    font-family: var(--font-serif);
+    line-height: 1.9;
+    font-size: 18px;
+    text-align: justify;
+    word-break: break-word;
+    transition: max-width 0.25s ease;
+  }
+
+  .reader h2 {
+    font-size: 1.6em;
+    text-align: center;
+    margin: 30px 0 10px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .reader h3 {
+    font-size: 1.2em;
+    text-align: center;
+    margin: 20px 0 8px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .reader p {
+    text-indent: 2em;
+    margin: 0.4em 0;
+  }
+  .reader .chapter-title {
+    font-size: 1.6em;
+    font-weight: 700;
+    text-align: center;
+    margin: 40px 0 30px;
+    color: var(--accent);
+    line-height: 1.4;
+  }
+
+  /* ========== Welcome / Empty State ========== */
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--text-secondary);
+    user-select: none;
+  }
+  .welcome .icon { font-size: 80px; margin-bottom: 20px; opacity: 0.6; }
+  .welcome h2 { font-size: 1.5em; color: var(--text); margin-bottom: 8px; }
+  .welcome p { font-size: 0.95em; margin: 4px 0; }
+  .welcome .drop-zone {
+    margin-top: 30px;
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 50px 60px;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .welcome .drop-zone:hover, .welcome .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--hover-bg);
+  }
+  .welcome .drop-zone .dz-icon { font-size: 48px; }
+  .welcome .drop-zone .dz-text { margin-top: 10px; font-size: 0.9em; }
+
+  /* ========== Loading / Progress ========== */
+  .progress-bar-container {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ========== Toast ========== */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #333;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ========== @media ========== */
+  @media (max-width: 768px) {
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; }
+    .sidebar.hidden { transform: translateX(-280px); min-width: 280px; width: 280px; }
+    .reader { font-size: 16px; }
+    .reader-container { padding: 24px 12px 60px; }
+    .toolbar { gap: 3px; padding: 8px 10px; }
+    .toolbar button { padding: 6px 8px; font-size: 0.78em; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="logo">📖</span>
+    <h1>小说阅读器</h1>
+  </div>
+  <div class="book-info" id="bookInfo">
+    <div class="title">未打开书籍</div>
+    <div class="meta">
+      <span id="bookMeta">点击下方按钮打开 .txt 文件</span>
+    </div>
+  </div>
+  <div class="sidebar-tabs">
+    <button id="tabShelf" class="active" onclick="switchTab('shelf')">📚 书架</button>
+    <button id="tabToc" onclick="switchTab('toc')">📑 目录</button>
+  </div>
+  <div class="shelf visible" id="shelf">
+    <div class="shelf-empty" id="shelfEmpty">暂无书籍，点击 📂 打开 导入</div>
+  </div>
+  <div class="toc" id="toc" style="display:none;"></div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="toolbar" id="toolbar">
+    <button onclick="toggleSidebar()" title="目录">📋 目录</button>
+    <label class="btn-file">
+      📂 打开
+      <input type="file" accept=".txt" id="fileInput" hidden onchange="handleFile(this.files[0])">
+    </label>
+    <span class="spacer"></span>
+    <div class="font-size-group">
+      <button onclick="changeFontSize(-1)" title="缩小字体">A-</button>
+      <span class="font-size-label" id="fontSizeLabel">18px</span>
+      <button onclick="changeFontSize(1)" title="放大字体">A+</button>
+    </div>
+    <div class="font-size-group" style="margin-left:4px;">
+      <button onclick="changeWidth(-40)" title="缩窄行宽">◀</button>
+      <span class="font-size-label" id="widthLabel">720px</span>
+      <button onclick="changeWidth(40)" title="加宽行宽">▶</button>
+    </div>
+    <button id="btnTheme" onclick="toggleTheme()" title="切换主题">🌙</button>
+    <span class="progress-text" id="progressText"></span>
+  </div>
+  <div class="progress-bar-container">
+    <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+  </div>
+
+  <div class="reader-container" id="readerContainer">
+    <div class="welcome" id="welcome">
+      <div class="icon">📚</div>
+      <h2>欢迎使用小说阅读器</h2>
+      <p>支持 .txt 文件，自动识别章节</p>
+      <p>记住阅读进度，下次打开自动恢复</p>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="dz-icon">📁</div>
+        <div class="dz-text">点击选择文件，或拖拽 .txt 文件到此处</div>
+      </div>
+    </div>
+    <div class="reader" id="reader" style="display:none;"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ State ============
+let currentBook = null;
+let chapters = [];
+let currentChapter = 0;
+let fontSize = parseInt(localStorage.getItem('reader_fontSize') || '18');
+let readerWidth = parseInt(localStorage.getItem('reader_width') || '720');
+let theme = localStorage.getItem('reader_theme') || 'light';
+let currentFilePath = null;
+
+const $ = (sel) => document.querySelector(sel);
+const reader = $('#reader');
+const welcome = $('#welcome');
+const tocEl = $('#toc');
+const bookInfo = $('#bookInfo');
+const progressBar = $('#progressBar');
+const progressText = $('#progressText');
+const fontSizeLabel = $('#fontSizeLabel');
+const widthLabel = $('#widthLabel');
+const btnTheme = $('#btnTheme');
+const readerContainer = $('#readerContainer');
+const fileInput = $('#fileInput');
+
+// ============ IndexedDB ============
+var hasDB = !!window.indexedDB;
+const DB_NAME = 'NovelReaderDB';
+const DB_VERSION = 1;
+function openDB() {
+  if (!hasDB) return Promise.reject(new Error('no DB'));
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains('books')) {
+        req.result.createObjectStore('books', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function dbSave(id, content, chapter) {
+  if (!hasDB) {
+    try {
+      var cutoff = content.substring(0, 500000);
+      localStorage.setItem('reader_book_' + id, JSON.stringify({ content: cutoff, chapter: chapter, time: Date.now() }));
+    } catch(e) {}
+    localStorage.setItem('reader_lastBook', JSON.stringify({ id, chapter, time: Date.now() }));
+    return;
+  }
+  try {
+    const db = await openDB();
+    const tx = db.transaction('books', 'readwrite');
+    tx.objectStore('books').put({ id, content, chapter, time: Date.now() });
+    await new Promise(r => { tx.oncomplete = r; tx.onerror = r; });
+    db.close();
+    localStorage.setItem('reader_lastBook', JSON.stringify({ id, chapter, time: Date.now() }));
+  } catch (e) { console.warn('DB save error:', e); }
+}
+async function dbLoad(id) {
+  if (!hasDB) {
+    try { return JSON.parse(localStorage.getItem('reader_book_' + id) || 'null'); } catch(e) { return null; }
+  }
+  try {
+    const db = await openDB();
+    const tx = db.transaction('books', 'readonly');
+    const result = await new Promise(r => {
+      const req = tx.objectStore('books').get(id);
+      req.onsuccess = () => r(req.result);
+      req.onerror = () => r(null);
+    });
+    db.close();
+    return result;
+  } catch (e) { return null; }
+}
+async function dbListAll() {
+  if (!hasDB) {
+    var keys = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('reader_book_') === 0) {
+          try {
+            var d = JSON.parse(localStorage.getItem(k));
+            keys.push({ id: k.replace('reader_book_', ''), chapter: d.chapter || 0, time: d.time || 0 });
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
+    return keys;
+  }
+  try {
+    const db = await openDB();
+    const tx = db.transaction('books', 'readonly');
+    const result = await new Promise(r => {
+      const req = tx.objectStore('books').getAll();
+      req.onsuccess = () => r(req.result);
+      req.onerror = () => r([]);
+    });
+    db.close();
+    return result;
+  } catch (e) { return []; }
+}
+async function dbDelete(id) {
+  if (!hasDB) { localStorage.removeItem('reader_book_' + id); return; }
+  try {
+    const db = await openDB();
+    const tx = db.transaction('books', 'readwrite');
+    tx.objectStore('books').delete(id);
+    await new Promise(r => { tx.oncomplete = r; tx.onerror = r; });
+    db.close();
+    localStorage.removeItem('reader_book_' + id);
+  } catch (e) {}
+}
+
+// ============ Init ============
+async function init() {
+  document.documentElement.setAttribute('data-theme', theme);
+  btnTheme.textContent = theme === 'dark' ? '☀️' : '🌙';
+  reader.style.fontSize = fontSize + 'px';
+  fontSizeLabel.textContent = fontSize + 'px';
+  reader.style.setProperty('--reader-width', readerWidth + 'px');
+  widthLabel.textContent = readerWidth + 'px';
+
+  // Render shelf
+  await renderShelf();
+
+  // Restore last book from IndexedDB
+  const pointer = JSON.parse(localStorage.getItem('reader_lastBook') || 'null');
+  if (pointer && pointer.id) {
+    const saved = await dbLoad(pointer.id);
+    if (saved && saved.content) {
+      currentFilePath = pointer.id;
+      currentBook = saved.content;
+      const restoreChapter = saved.chapter || 0;
+      renderBook();
+      jumpToChapter(restoreChapter, false);
+      updateProgress();
+      showToast('📖 已恢复上次阅读：' + pointer.id);
+    } else {
+      currentFilePath = pointer.id;
+      bookInfo.innerHTML =
+        '<div class="title">' + escapeHtml(pointer.id) + '</div>' +
+        '<div class="meta"><span>上次读到第 ' + ((pointer.chapter || 0) + 1) + ' 章 — 请重新导入文件恢复内容</span></div>';
+    }
+  }
+}
+
+// ============ File Handling ============
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  const path = file.webkitRelativePath || file.name;
+  // Ensure multiple select works
+  if (fileInput.files.length > 1) { file = fileInput.files[fileInput.files.length - 1]; }
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const buf = new Uint8Array(e.target.result);
+    const content = await detectAndDecode(buf);
+    if (content.length > 100_000_000) {
+      showToast('文件过大（最大 100MB），请先分割文件');
+      return;
+    }
+    currentFilePath = path;
+    currentBook = content;
+    renderBook();
+    saveState();
+    await renderShelf();
+    showToast('✅ 已加载：' + file.name + '  (' + detectEncoding(buf) + ')');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ============ Encoding Detection ============
+function detectEncodingFromBuf(buf) {
+  if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) return 'utf-8';
+  if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) return 'utf-16le';
+  if (buf.length >= 2 && buf[0] === 0xFE && buf[1] === 0xFF) return 'utf-16be';
+  if (isValidUTF8(buf)) return 'utf-8';
+  return 'gbk';
+}
+
+// Use Blob+FileReader for GBK decoding (more compatible than TextDecoder)
+function decodeBlob(buf, encoding) {
+  return new Promise(function(resolve) {
+    // Strip BOM
+    var start = 0;
+    if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) start = 3;
+    else if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) start = 2;
+    else if (buf.length >= 2 && buf[0] === 0xFE && buf[1] === 0xFF) start = 2;
+
+    var slice = buf.slice(start);
+    var blob = new Blob([slice], { type: 'text/plain;charset=' + encoding });
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result); };
+    reader.onerror = function() {
+      // Fallback: try without charset
+      var r2 = new FileReader();
+      r2.onload = function() { resolve(r2.result); };
+      r2.readAsText(new Blob([slice]));
+    };
+    reader.readAsText(blob);
+  });
+}
+
+function detectEncoding(buf) {
+  return detectEncodingFromBuf(buf).toUpperCase();
+}
+
+async function detectAndDecode(buf) {
+  var enc = detectEncodingFromBuf(buf);
+  // Try TextDecoder first (modern browsers)
+  if (typeof TextDecoder !== 'undefined') {
+    try {
+      return new TextDecoder(enc).decode(buf);
+    } catch(e) {}
+    // Try alternate encoding names
+    var aliases = (enc === 'gbk') ? ['gb18030', 'gb2312', 'chinese'] : [enc];
+    for (var i = 0; i < aliases.length; i++) {
+      try {
+        return new TextDecoder(aliases[i]).decode(buf);
+      } catch(e) {}
+    }
+  }
+  // Fallback: use Blob + FileReader (works in older browsers too)
+  return await decodeBlob(buf, enc);
+}
+
+function isValidUTF8(buf) {
+  let i = 0;
+  const len = buf.length;
+  // Sample up to 64KB for performance
+  const sampleEnd = Math.min(len, 65536);
+  while (i < sampleEnd) {
+    const b = buf[i];
+    if (b < 0x80) { i++; continue; }
+    if (b >= 0xC2 && b <= 0xDF) {
+      if (i + 1 >= sampleEnd) return true;
+      if ((buf[i + 1] & 0xC0) !== 0x80) return false;
+      i += 2;
+      continue;
+    }
+    if (b >= 0xE0 && b <= 0xEF) {
+      if (i + 2 >= sampleEnd) return true;
+      if ((buf[i + 1] & 0xC0) !== 0x80) return false;
+      if ((buf[i + 2] & 0xC0) !== 0x80) return false;
+      // Check overlong
+      if (b === 0xE0 && (buf[i + 1] & 0xE0) === 0x80) return false;
+      if (b === 0xED && (buf[i + 1] & 0xE0) === 0xA0) return false;
+      i += 3;
+      continue;
+    }
+    if (b >= 0xF0 && b <= 0xF4) {
+      if (i + 3 >= sampleEnd) return true;
+      if ((buf[i + 1] & 0xC0) !== 0x80) return false;
+      if ((buf[i + 2] & 0xC0) !== 0x80) return false;
+      if ((buf[i + 3] & 0xC0) !== 0x80) return false;
+      if (b === 0xF0 && (buf[i + 1] & 0xF0) === 0x80) return false;
+      if (b === 0xF4 && buf[i + 1] > 0x8F) return false;
+      i += 4;
+      continue;
+    }
+    return false; // Invalid lead byte
+  }
+  return true;
+}
+
+// ============ Chapter Detection ============
+function detectChapters(text) {
+  // Multiple patterns for chapter detection
+  const patterns = [
+    /(?:第[零一二三四五六七八九十百千万0-9]+[章节回卷部篇集])\s*.+/g,
+    /(?:Chapter|CH|Ch)\s*\d+/gi,
+    /(?:[Cc][Hh][Aa][Pp][Tt][Ee][Rr]\s*[IVXLCDM0-9]+)/g,
+    /^\s*(?:第[0-9零一二三四五六七八九十百千]+[章节回])\s*.+/gm,
+    /^\s*(?:[0-9]+[\.、．]\s*.+)/gm,
+  ];
+
+  let matches = [];
+  for (const pat of patterns) {
+    const found = [...text.matchAll(new RegExp(pat.source, 'gm'))];
+    for (const m of found) {
+      if (m.index !== undefined) {
+        matches.push({ title: m[0].trim(), index: m.index });
+      }
+    }
+  }
+
+  // Deduplicate by index
+  matches.sort((a, b) => a.index - b.index);
+  const deduped = [];
+  for (const m of matches) {
+    if (deduped.length === 0 || m.index - deduped[deduped.length - 1].index > 10) {
+      deduped.push(m);
+    }
+  }
+
+  return deduped;
+}
+
+// ============ Render ============
+function renderBook() {
+  if (!currentBook) return;
+
+  welcome.style.display = 'none';
+  reader.style.display = '';
+  chapters = detectChapters(currentBook);
+
+  // Update book info
+  const fileName = currentFilePath || '未知文件';
+  const totalChars = currentBook.replace(/\s/g, '').length;
+  const wordCount = totalChars > 10000
+    ? (totalChars / 10000).toFixed(1) + '万字'
+    : totalChars + '字';
+  bookInfo.innerHTML = `
+    <div class="title">${escapeHtml(fileName)}</div>
+    <div class="meta">
+      <span>📊 ${wordCount}</span>
+      <span>📑 ${chapters.length} 章</span>
+    </div>
+  `;
+
+  // Build TOC
+  tocEl.innerHTML = '';
+  if (chapters.length === 0) {
+    // No chapters found, treat as single chapter
+    chapters = [{ title: '全文', index: 0 }];
+  }
+
+  chapters.forEach((ch, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'toc-item';
+    btn.innerHTML = `<span class="chapter-num">${(i + 1).toString().padStart(2, '0')}</span>${escapeHtml(ch.title)}`;
+    btn.onclick = () => jumpToChapter(i);
+    tocEl.appendChild(btn);
+  });
+
+  // Render first chapter
+  renderChapter(currentChapter);
+}
+
+function renderChapter(idx) {
+  if (idx < 0 || idx >= chapters.length) return;
+  currentChapter = idx;
+
+  const start = chapters[idx].index;
+  const end = idx + 1 < chapters.length ? chapters[idx + 1].index : currentBook.length;
+  let content = currentBook.slice(start, end).trim();
+
+  // Format content
+  const lines = content.split(/\r?\n/);
+  let html = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    if (!line) {
+      html += '<br>';
+      continue;
+    }
+
+    // Chapter title line (first meaningful line)
+    if (i === 0 && chapters.length > 1) {
+      html += `<div class="chapter-title">${escapeHtml(line)}</div>`;
+    } else if (line.match(/^(第[零一二三四五六七八九十百千万0-9]+[章节回卷部篇集])/)) {
+      html += `<h2>${escapeHtml(line)}</h2>`;
+    } else if (line.match(/^[（(][一二三四五六七八九十]+[)）]/)) {
+      html += `<h3>${escapeHtml(line)}</h3>`;
+    } else {
+      html += `<p>${escapeHtml(line)}</p>`;
+    }
+  }
+
+  reader.innerHTML = html;
+  readerContainer.scrollTop = 0;
+
+  // Update TOC active state
+  tocEl.querySelectorAll('.toc-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+
+  updateProgress();
+  saveState();
+}
+
+function jumpToChapter(idx, save = true) {
+  renderChapter(idx);
+  if (save) saveState();
+  // Close sidebar on mobile
+  if (window.innerWidth <= 768) {
+    $('#sidebar').classList.add('hidden');
+  }
+}
+
+// ============ Progress ============
+function updateProgress() {
+  if (!currentBook || chapters.length === 0) return;
+
+  // Estimate reading progress based on character position
+  const start = chapters[currentChapter].index;
+  const end = currentChapter + 1 < chapters.length
+    ? chapters[currentChapter + 1].index
+    : currentBook.length;
+  const chapterProgress = readerContainer.scrollTop / (readerContainer.scrollHeight - readerContainer.clientHeight) || 0;
+
+  const overallStart = chapters[currentChapter].index / currentBook.length;
+  const overallEnd = end / currentBook.length;
+  const overall = overallStart + chapterProgress * (overallEnd - overallStart);
+
+  const pct = Math.min(100, Math.round(overall * 100));
+  progressBar.style.width = pct + '%';
+  progressText.textContent = pct + '%';
+}
+
+readerContainer.addEventListener('scroll', updateProgress);
+
+// ============ Persistence ============
+function saveState() {
+  if (!currentBook || !currentFilePath) return;
+  dbSave(currentFilePath, currentBook, currentChapter);
+}
+
+// ============ Theme ============
+function toggleTheme() {
+  theme = theme === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  btnTheme.textContent = theme === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('reader_theme', theme);
+}
+
+// ============ Font Size ============
+function changeFontSize(delta) {
+  fontSize = Math.max(12, Math.min(32, fontSize + delta));
+  reader.style.fontSize = fontSize + 'px';
+  fontSizeLabel.textContent = fontSize + 'px';
+  localStorage.setItem('reader_fontSize', fontSize);
+}
+
+// ============ Width ============
+function changeWidth(delta) {
+  readerWidth = Math.max(400, Math.min(1200, readerWidth + delta));
+  reader.style.setProperty('--reader-width', readerWidth + 'px');
+  widthLabel.textContent = readerWidth + 'px';
+  localStorage.setItem('reader_width', readerWidth);
+}
+
+// ============ Sidebar ============
+function toggleSidebar() {
+  $('#sidebar').classList.toggle('hidden');
+}
+
+// ============ Shelf & Tabs ============
+function switchTab(tab) {
+  const tabShelf = $('#tabShelf');
+  const tabToc = $('#tabToc');
+  const shelf = $('#shelf');
+  const toc = $('#toc');
+  if (tab === 'shelf') {
+    tabShelf.classList.add('active');
+    tabToc.classList.remove('active');
+    shelf.classList.add('visible');
+    shelf.style.display = '';
+    toc.style.display = 'none';
+  } else {
+    tabToc.classList.add('active');
+    tabShelf.classList.remove('active');
+    shelf.classList.remove('visible');
+    shelf.style.display = 'none';
+    toc.style.display = '';
+  }
+}
+
+async function renderShelf() {
+  const shelf = $('#shelf');
+  const books = await dbListAll();
+  // Sort by last read time, most recent first
+  books.sort((a, b) => (b.time || 0) - (a.time || 0));
+
+  shelf.innerHTML = '';
+  if (books.length === 0) {
+    shelf.innerHTML = '<div class="shelf-empty">暂无书籍<br>拖拽 .txt 或点击 📂 打开</div>';
+    return;
+  }
+
+  books.forEach(b => {
+    const div = document.createElement('div');
+    div.className = 'shelf-item' + (b.id === currentFilePath ? ' current' : '');
+    const totalChars = (b.content || '').replace(/\s/g, '').length;
+    const wordCount = totalChars > 10000 ? (totalChars / 10000).toFixed(1) + '万字' : totalChars + '字';
+    const chapterInfo = b.chapter != null ? '读到第' + (b.chapter + 1) + '章' : '';
+    div.innerHTML =
+      '<span class="shelf-info">' +
+        '<div class="shelf-name">' + escapeHtml(b.id) + '</div>' +
+        '<div class="shelf-meta">📊 ' + wordCount + (chapterInfo ? ' · 📍 ' + chapterInfo : '') + '</div>' +
+      '</span>' +
+      '<button class="shelf-del" title="删除">✕</button>';
+
+    div.onclick = (e) => {
+      if (e.target.classList.contains('shelf-del')) return;
+      switchBook(b.id);
+    };
+    div.querySelector('.shelf-del').onclick = (e) => {
+      e.stopPropagation();
+      deleteBook(b.id);
+    };
+    shelf.appendChild(div);
+  });
+}
+
+async function switchBook(id) {
+  if (id === currentFilePath && currentBook) return; // already reading this book
+  const saved = await dbLoad(id);
+  if (!saved || !saved.content) {
+    showToast('⚠️ 书籍内容已丢失，请重新导入');
+    return;
+  }
+  currentFilePath = id;
+  currentBook = saved.content;
+  currentChapter = saved.chapter || 0;
+  renderBook();
+  jumpToChapter(currentChapter, false);
+  updateProgress();
+  await renderShelf();
+  showToast('📖 已切换：' + id);
+}
+
+async function deleteBook(id) {
+  if (!confirm('确定要移除「' + id + '」吗？\n（不会删除你的原始文件）')) return;
+  await dbDelete(id);
+  if (id === currentFilePath) {
+    // Currently reading this book — clear the reader
+    currentBook = null;
+    currentFilePath = null;
+    chapters = [];
+    currentChapter = 0;
+    reader.style.display = 'none';
+    reader.innerHTML = '';
+    welcome.style.display = '';
+    bookInfo.innerHTML = '<div class="title">未打开书籍</div><div class="meta"><span>点击下方按钮打开 .txt 文件</span></div>';
+    progressBar.style.width = '0%';
+    progressText.textContent = '';
+    tocEl.innerHTML = '';
+    localStorage.removeItem('reader_lastBook');
+  }
+  await renderShelf();
+  showToast('🗑️ 已移除：' + id);
+}
+
+// ============ Keyboard Shortcuts ============
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      if (currentChapter > 0) jumpToChapter(currentChapter - 1);
+      break;
+    case 'ArrowRight':
+      if (currentChapter < chapters.length - 1) jumpToChapter(currentChapter + 1);
+      break;
+    case 't':
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); toggleTheme(); }
+      break;
+    case '=':
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeFontSize(1); }
+      break;
+    case '-':
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeFontSize(-1); }
+      break;
+    case '[':
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeWidth(-40); }
+      break;
+    case ']':
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeWidth(40); }
+      break;
+    case 'b':
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); toggleSidebar(); }
+      break;
+  }
+});
+
+// ============ Drag & Drop ============
+const dropZone = $('#dropZone');
+document.addEventListener('dragover', (e) => { e.preventDefault(); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && (file.name.endsWith('.txt') || file.type === 'text/plain')) {
+    handleFile(file);
+  } else {
+    showToast('⚠️ 请拖入 .txt 文件');
+  }
+});
+
+// Highlight drop zone
+document.addEventListener('dragenter', (e) => {
+  if (e.target === dropZone || dropZone.contains(e.target)) {
+    dropZone.classList.add('drag-over');
+  }
+});
+document.addEventListener('dragleave', (e) => {
+  if (e.target === dropZone || dropZone.contains(e.target)) {
+    dropZone.classList.remove('drag-over');
+  }
+});
+
+// ============ Toast ============
+let toastTimer;
+function showToast(msg) {
+  const toast = $('#toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ============ Helpers ============
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ============ Service Worker for PWA-like offline ============
+// Not strictly needed since it's a local file, but could be added
+
+// ============ Start ============
+init();
+</script>
+</body>
+</html>
