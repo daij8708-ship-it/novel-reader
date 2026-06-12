@@ -267,8 +267,9 @@
     border-bottom: 1px solid var(--border);
     background: var(--card-bg);
     flex-wrap: wrap;
-    transition: background var(--transition);
+    transition: transform 0.25s, opacity 0.25s, background var(--transition);
   }
+  .toolbar.hidden-bar { transform: translateY(-100%); opacity: 0; pointer-events: none; }
 
   .toolbar button, .toolbar .btn-file {
     display: inline-flex;
@@ -444,7 +445,9 @@
     height: 3px;
     background: var(--border);
     position: relative;
+    transition: transform 0.25s, opacity 0.25s;
   }
+  .progress-bar-container.hidden-bar { transform: translateY(-100%); opacity: 0; }
   .progress-bar-fill {
     height: 100%;
     background: var(--accent);
@@ -1040,7 +1043,26 @@ function jumpToChapter(idx, save) {
 
 // Scroll detection: auto-append next chapter, update current chapter
 var scrollTimer = null;
+var lastScrollY = 0;
 readerContainer.addEventListener('scroll', function() {
+  // Toolbar auto-hide: hide on scroll down, show on scroll up
+  if (window.innerWidth <= 480) {
+    var scrollY = readerContainer.scrollTop;
+    var delta = scrollY - lastScrollY;
+    if (Math.abs(delta) > 10) {
+      var toolbar = document.getElementById('toolbar');
+      var progBar = document.querySelector('.progress-bar-container');
+      if (delta > 0 && scrollY > 60) {
+        toolbar.classList.add('hidden-bar');
+        if (progBar) progBar.classList.add('hidden-bar');
+      } else {
+        toolbar.classList.remove('hidden-bar');
+        if (progBar) progBar.classList.remove('hidden-bar');
+      }
+      lastScrollY = scrollY;
+    }
+  }
+
   if (!currentBook || chapters.length === 0) return;
 
   // Detect which chapter is currently visible
