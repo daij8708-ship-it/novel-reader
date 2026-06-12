@@ -267,9 +267,18 @@
     border-bottom: 1px solid var(--border);
     background: var(--card-bg);
     flex-wrap: wrap;
-    transition: transform 0.25s, opacity 0.25s, background var(--transition);
+    max-height: 100px;
+    transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, border-color 0.3s ease, background var(--transition);
   }
-  .toolbar.hidden-bar { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+  .toolbar.hidden-bar {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    overflow: hidden;
+  }
 
   .toolbar button, .toolbar .btn-file {
     display: inline-flex;
@@ -445,9 +454,14 @@
     height: 3px;
     background: var(--border);
     position: relative;
-    transition: transform 0.25s, opacity 0.25s;
+    max-height: 3px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
   }
-  .progress-bar-container.hidden-bar { transform: translateY(-100%); opacity: 0; }
+  .progress-bar-container.hidden-bar {
+    max-height: 0;
+    opacity: 0;
+  }
   .progress-bar-fill {
     height: 100%;
     background: var(--accent);
@@ -1043,24 +1057,28 @@ function jumpToChapter(idx, save) {
 
 // Scroll detection: auto-append next chapter, update current chapter
 var scrollTimer = null;
-var lastScrollY = 0;
+var toolbarVisible = true;
+
+function showToolbar() {
+  var toolbar = document.getElementById('toolbar');
+  var progBar = document.querySelector('.progress-bar-container');
+  toolbar.classList.remove('hidden-bar');
+  if (progBar) progBar.classList.remove('hidden-bar');
+  toolbarVisible = true;
+}
+
+function hideToolbar() {
+  var toolbar = document.getElementById('toolbar');
+  var progBar = document.querySelector('.progress-bar-container');
+  toolbar.classList.add('hidden-bar');
+  if (progBar) progBar.classList.add('hidden-bar');
+  toolbarVisible = false;
+}
+
 readerContainer.addEventListener('scroll', function() {
-  // Toolbar auto-hide: hide on scroll down, show on scroll up
-  if (window.innerWidth <= 480) {
-    var scrollY = readerContainer.scrollTop;
-    var delta = scrollY - lastScrollY;
-    if (Math.abs(delta) > 10) {
-      var toolbar = document.getElementById('toolbar');
-      var progBar = document.querySelector('.progress-bar-container');
-      if (delta > 0 && scrollY > 60) {
-        toolbar.classList.add('hidden-bar');
-        if (progBar) progBar.classList.add('hidden-bar');
-      } else {
-        toolbar.classList.remove('hidden-bar');
-        if (progBar) progBar.classList.remove('hidden-bar');
-      }
-      lastScrollY = scrollY;
-    }
+  // Always hide toolbar on scroll (any direction) past threshold
+  if (readerContainer.scrollTop > 30 && toolbarVisible) {
+    hideToolbar();
   }
 
   if (!currentBook || chapters.length === 0) return;
@@ -1090,6 +1108,27 @@ readerContainer.addEventListener('scroll', function() {
     appendNextChapter();
   }
 }, { passive: true });
+
+// Click/Tap middle of reader area to show toolbar
+readerContainer.addEventListener('click', function(e) {
+  // Ignore clicks on interactive elements or during text selection
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('label') || e.target.closest('input')) return;
+  if (window.getSelection().toString().trim().length > 0) return;
+
+  // Only respond to clicks in the middle 80% of the reader viewport
+  var rect = readerContainer.getBoundingClientRect();
+  var clickY = e.clientY - rect.top;
+  var middleStart = rect.height * 0.1;
+  var middleEnd = rect.height * 0.9;
+
+  if (clickY > middleStart && clickY < middleEnd) {
+    if (toolbarVisible) {
+      hideToolbar();
+    } else {
+      showToolbar();
+    }
+  }
+});
 
 function showBottomNav() {}
 function hideBottomNav() {}
