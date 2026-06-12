@@ -947,181 +947,130 @@ function detectChapters(text) {
 }
 
 // ============ Render ============
+var lastLoadedChapter = -1;
+var nextChapterLoading = false;
+
+function formatChapterContent(idx) {
+  if (idx < 0 || idx >= chapters.length) return '';
+  var start = chapters[idx].index;
+  var end = idx + 1 < chapters.length ? chapters[idx + 1].index : currentBook.length;
+  var content = currentBook.slice(start, end).trim();
+  var lines = content.split(/\r?\n/);
+  var html = '<div class="chapter-block" data-ch="' + idx + '">';
+  var isFirstLine = true;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) { html += '<br>'; isFirstLine = false; continue; }
+    if (isFirstLine && chapters.length > 1) {
+      html += '<div class="chapter-title">' + escapeHtml(line) + '</div>';
+    } else if (line.match(/^(第[零一二三四五六七八九十百千万0-9]+[章节回卷部篇集])/)) {
+      html += '<h2>' + escapeHtml(line) + '</h2>';
+    } else if (line.match(/^[（(][一二三四五六七八九十]+[)）]/)) {
+      html += '<h3>' + escapeHtml(line) + '</h3>';
+    } else {
+      html += '<p>' + escapeHtml(line) + '</p>';
+    }
+    isFirstLine = false;
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderBook() {
   if (!currentBook) return;
-
   welcome.style.display = 'none';
   reader.style.display = '';
   chapters = detectChapters(currentBook);
-
-  // Update book info
-  const fileName = currentFilePath || '未知文件';
-  const totalChars = currentBook.replace(/\s/g, '').length;
-  const wordCount = totalChars > 10000
-    ? (totalChars / 10000).toFixed(1) + '万字'
-    : totalChars + '字';
-  bookInfo.innerHTML = `
-    <div class="title">${escapeHtml(fileName)}</div>
-    <div class="meta">
-      <span>📊 ${wordCount}</span>
-      <span>📑 ${chapters.length} 章</span>
-    </div>
-  `;
-
-  // Build TOC
+  var fileName = currentFilePath || '未知文件';
+  var totalChars = currentBook.replace(/\s/g, '').length;
+  var wordCount = totalChars > 10000 ? (totalChars / 10000).toFixed(1) + '万字' : totalChars + '字';
+  bookInfo.innerHTML = '<div class="title">' + escapeHtml(fileName) + '</div>' +
+    '<div class="meta"><span>📊 ' + wordCount + '</span><span>📑 ' + chapters.length + ' 章</span></div>';
   tocEl.innerHTML = '';
-  if (chapters.length === 0) {
-    // No chapters found, treat as single chapter
-    chapters = [{ title: '全文', index: 0 }];
-  }
-
-  chapters.forEach((ch, i) => {
-    const btn = document.createElement('button');
+  if (chapters.length === 0) chapters = [{ title: '全文', index: 0 }];
+  chapters.forEach(function(ch, i) {
+    var btn = document.createElement('button');
     btn.className = 'toc-item';
-    btn.innerHTML = `<span class="chapter-num">${(i + 1).toString().padStart(2, '0')}</span>${escapeHtml(ch.title)}`;
-    btn.onclick = () => jumpToChapter(i);
+    btn.innerHTML = '<span class="chapter-num">' + (i + 1).toString().padStart(2, '0') + '</span>' + escapeHtml(ch.title);
+    btn.onclick = function() { jumpToChapter(i); };
     tocEl.appendChild(btn);
   });
-
-  // Render first chapter
+  // Start from saved chapter or chapter 1
   renderChapter(currentChapter);
 }
 
 function renderChapter(idx) {
   if (idx < 0 || idx >= chapters.length) return;
   currentChapter = idx;
-
-  const start = chapters[idx].index;
-  const end = idx + 1 < chapters.length ? chapters[idx + 1].index : currentBook.length;
-  let content = currentBook.slice(start, end).trim();
-
-  // Format content
-  const lines = content.split(/\r?\n/);
-  let html = '';
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim();
-    if (!line) {
-      html += '<br>';
-      continue;
-    }
-
-    // Chapter title line (first meaningful line)
-    if (i === 0 && chapters.length > 1) {
-      html += `<div class="chapter-title">${escapeHtml(line)}</div>`;
-    } else if (line.match(/^(第[零一二三四五六七八九十百千万0-9]+[章节回卷部篇集])/)) {
-      html += `<h2>${escapeHtml(line)}</h2>`;
-    } else if (line.match(/^[（(][一二三四五六七八九十]+[)）]/)) {
-      html += `<h3>${escapeHtml(line)}</h3>`;
-    } else {
-      html += `<p>${escapeHtml(line)}</p>`;
-    }
-  }
-
-  reader.innerHTML = html;
-  // Add chapter nav buttons at the bottom
-  var navHtml = '<div class="chapter-nav">';
-  if (idx > 0) {
-    navHtml += '<button onclick="prevChapter()">◀ 上一章</button>';
-  } else {
-    navHtml += '<button disabled>◀ 已是第一章</button>';
-  }
-  if (idx < chapters.length - 1) {
-    navHtml += '<button onclick="nextChapter()">下一章 ▶</button>';
-  } else {
-    navHtml += '<button disabled>已是最后一章 ▶</button>';
-  }
-  navHtml += '</div>';
-  reader.innerHTML += navHtml;
+  lastLoadedChapter = idx;
+  reader.innerHTML = formatChapterContent(idx);
   readerContainer.scrollTop = 0;
-
-  // Update TOC active state
-  tocEl.querySelectorAll('.toc-item').forEach((el, i) => {
-    el.classList.toggle('active', i === idx);
-  });
-
+  tocEl.querySelectorAll('.toc-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
   updateProgress();
-  updateBottomNav();
   saveState();
 }
 
-function jumpToChapter(idx, save = true) {
-  renderChapter(idx);
-  if (save) saveState();
-  if (window.innerWidth <= 768) closeSidebar();
-  if (window.innerWidth <= 480) showBottomNav();
-}
-
-function prevChapter() {
-  if (currentChapter > 0) jumpToChapter(currentChapter - 1);
-}
-
-function nextChapter() {
-  if (currentChapter < chapters.length - 1) jumpToChapter(currentChapter + 1);
-}
-
-function updateBottomNav() {
-  var nav = document.getElementById('bottomNav');
-  if (!nav || !currentBook || chapters.length === 0) {
-    if (nav) nav.style.display = 'none';
+function appendNextChapter() {
+  if (nextChapterLoading) return;
+  var next = lastLoadedChapter + 1;
+  if (next >= chapters.length) {
+    // All chapters loaded
     return;
   }
-  var prevBtn = document.getElementById('bnPrev');
-  var nextBtn = document.getElementById('bnNext');
-  if (!prevBtn || !nextBtn) return;
-  if (currentChapter <= 0) {
-    prevBtn.disabled = true;
-    prevBtn.textContent = '◀ 已是第一章';
-  } else {
-    prevBtn.disabled = false;
-    var prevTitle = chapters[currentChapter - 1] ? chapters[currentChapter - 1].title : '上一章';
-    prevBtn.textContent = '◀ ' + prevTitle.substring(0, 12);
-  }
-  if (currentChapter >= chapters.length - 1) {
-    nextBtn.disabled = true;
-    nextBtn.textContent = '已是最后一章 ▶';
-  } else {
-    nextBtn.disabled = false;
-    var nextTitle = chapters[currentChapter + 1] ? chapters[currentChapter + 1].title : '下一章';
-    nextBtn.textContent = nextTitle.substring(0, 12) + ' ▶';
-  }
-  nav.style.display = window.innerWidth <= 480 ? 'flex' : 'none';
+  nextChapterLoading = true;
+  var html = formatChapterContent(next);
+  reader.innerHTML += html;
+  lastLoadedChapter = next;
+  // Update current chapter if we scrolled past the boundary
+  // Wait a tick to let DOM settle
+  setTimeout(function() { nextChapterLoading = false; }, 100);
 }
 
-// Tap to show bottom nav, scroll to hide
-var bottomNavTimer = null;
-function showBottomNav() {
-  var nav = document.getElementById('bottomNav');
-  if (!nav || window.innerWidth > 480) return;
-  nav.classList.add('visible');
-  clearTimeout(bottomNavTimer);
-  bottomNavTimer = setTimeout(function() { hideBottomNav(); }, 4000);
+function jumpToChapter(idx, save) {
+  if (save === undefined) save = true;
+  currentChapter = idx;
+  lastLoadedChapter = idx;
+  reader.innerHTML = formatChapterContent(idx);
+  readerContainer.scrollTop = 0;
+  tocEl.querySelectorAll('.toc-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
+  updateProgress();
+  if (save) saveState();
+  if (window.innerWidth <= 768) closeSidebar();
 }
-function hideBottomNav() {
-  var nav = document.getElementById('bottomNav');
-  if (nav) nav.classList.remove('visible');
-}
-readerContainer.addEventListener('click', function(e) {
-  if (!currentBook) return;
-  // Don't toggle when clicking nav buttons, chapter buttons, or toolbar
-  var tag = (e.target.tagName || '').toLowerCase();
-  if (tag === 'button' || tag === 'a' || tag === 'label' || tag === 'input') return;
-  if (e.target.closest && (e.target.closest('button') || e.target.closest('.chapter-nav'))) return;
-  var nav = document.getElementById('bottomNav');
-  if (!nav) return;
-  if (nav.classList.contains('visible')) {
-    hideBottomNav();
-  } else {
-    showBottomNav();
-  }
-});
+
+// Scroll detection: auto-append next chapter, update current chapter
+var scrollTimer = null;
 readerContainer.addEventListener('scroll', function() {
-  // Hide nav while actively scrolling
-  hideBottomNav();
+  if (!currentBook || chapters.length === 0) return;
+
+  // Detect which chapter is currently visible
+  var blocks = reader.querySelectorAll('.chapter-block');
+  var containerTop = readerContainer.scrollTop;
+  for (var i = 0; i < blocks.length; i++) {
+    var rect = blocks[i].getBoundingClientRect();
+    // Chapter is in view if its top is within the top half of the viewport
+    if (rect.top < readerContainer.clientHeight * 0.5 && rect.bottom > 0) {
+      var chIdx = parseInt(blocks[i].getAttribute('data-ch'), 10);
+      if (!isNaN(chIdx) && chIdx !== currentChapter) {
+        currentChapter = chIdx;
+        tocEl.querySelectorAll('.toc-item').forEach(function(el, j) { el.classList.toggle('active', j === chIdx); });
+        saveState();
+      }
+      break;
+    }
+  }
+
+  updateProgress();
+
+  // Auto-append next chapter when near bottom (within 300px)
+  var distFromBottom = readerContainer.scrollHeight - readerContainer.scrollTop - readerContainer.clientHeight;
+  if (distFromBottom < 300) {
+    appendNextChapter();
+  }
 }, { passive: true });
-readerContainer.addEventListener('touchend', function() {
-  // Don't auto-hide immediately after scroll ends — let the click handler toggle
-});
+
+function showBottomNav() {}
+function hideBottomNav() {}
 
 // ============ Progress ============
 function updateProgress() {
