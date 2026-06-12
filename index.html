@@ -1019,6 +1019,8 @@ function renderBook() {
   });
   // Start from saved chapter or chapter 1
   renderChapter(currentChapter);
+  // Try entering fullscreen (works when called from user gesture like file open / shelf click)
+  requestFullscreen();
 }
 
 function renderChapter(idx) {
@@ -1084,6 +1086,14 @@ function exitFullscreen() {
   else if (document.msExitFullscreen) { document.msExitFullscreen(); }
 }
 
+// When user exits fullscreen via back button / edge swipe, show toolbar
+document.addEventListener('fullscreenchange', function() {
+  if (!isFullscreen()) showToolbar();
+});
+document.addEventListener('webkitfullscreenchange', function() {
+  if (!isFullscreen()) showToolbar();
+});
+
 function showToolbar() {
   var toolbar = document.getElementById('toolbar');
   var progBar = document.querySelector('.progress-bar-container');
@@ -1091,12 +1101,9 @@ function showToolbar() {
   if (progBar) progBar.classList.remove('hidden-bar');
   toolbarVisible = true;
   // Prevent scroll handler from immediately hiding it
-  // (toolbar appearing pushes content down, which triggers a scroll event)
   toolbarJustShown = true;
   clearTimeout(toolbarShowTimer);
   toolbarShowTimer = setTimeout(function() { toolbarJustShown = false; }, 500);
-  // Exit fullscreen so browser controls are accessible
-  if (isFullscreen()) exitFullscreen();
 }
 
 function hideToolbar() {
@@ -1106,12 +1113,10 @@ function hideToolbar() {
   if (progBar) progBar.classList.add('hidden-bar');
   toolbarVisible = false;
   toolbarJustShown = false;
-  // Enter fullscreen for immersive reading
-  if (!isFullscreen() && currentBook) requestFullscreen();
 }
 
 readerContainer.addEventListener('scroll', function() {
-  // Always hide toolbar on scroll (any direction) past threshold
+  // Hide toolbar on any scroll past threshold
   if (readerContainer.scrollTop > 30 && toolbarVisible && !toolbarJustShown) {
     hideToolbar();
   }
@@ -1144,13 +1149,13 @@ readerContainer.addEventListener('scroll', function() {
   }
 }, { passive: true });
 
-// Click/Tap middle of reader area to show toolbar
+// Tap middle of reader area → toggle toolbar + fullscreen
 readerContainer.addEventListener('click', function(e) {
   // Ignore clicks on interactive elements or during text selection
   if (e.target.closest('button') || e.target.closest('a') || e.target.closest('label') || e.target.closest('input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
 
-  // Only respond to clicks in the middle 80% of the reader viewport
+  // Only respond to taps in the middle 80% of the viewport
   var rect = readerContainer.getBoundingClientRect();
   var clickY = e.clientY - rect.top;
   var middleStart = rect.height * 0.1;
@@ -1158,9 +1163,20 @@ readerContainer.addEventListener('click', function(e) {
 
   if (clickY > middleStart && clickY < middleEnd) {
     if (toolbarVisible) {
+      // Toolbar showing → enter reading mode: hide toolbar, go fullscreen
       hideToolbar();
-    } else {
+      if (currentBook && !isFullscreen()) requestFullscreen();
+    } else if (isFullscreen()) {
+      // Immersive reading → show controls: exit fullscreen, show toolbar
+      exitFullscreen();
       showToolbar();
+    } else {
+      // Toolbar hidden, not fullscreen → enter immersive reading
+      if (currentBook) {
+        requestFullscreen();
+      } else {
+        showToolbar();
+      }
     }
   }
 });
@@ -1497,8 +1513,10 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ============ Service Worker for PWA-like offline ============
-// Not strictly needed since it's a local file, but could be added
+// ============ Service Worker for PWA ============
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/novel-reader/sw.js').catch(function(){});
+}
 
 // ============ Start ============
 init();
