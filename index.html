@@ -544,11 +544,6 @@
       <span class="font-size-label" id="fontSizeLabel">18px</span>
       <button onclick="changeFontSize(1)" title="放大字体">A+</button>
     </div>
-    <div class="font-size-group" style="margin-left:4px;">
-      <button onclick="changeWidth(-40)" title="缩窄行宽">◀</button>
-      <span class="font-size-label" id="widthLabel">720px</span>
-      <button onclick="changeWidth(40)" title="加宽行宽">▶</button>
-    </div>
     <button id="btnTheme" onclick="toggleTheme()" title="切换主题">🌙</button>
     <span class="progress-text" id="progressText"></span>
   </div>
@@ -579,7 +574,6 @@ let currentBook = null;
 let chapters = [];
 let currentChapter = 0;
 let fontSize = parseInt(localStorage.getItem('reader_fontSize') || '18');
-let readerWidth = parseInt(localStorage.getItem('reader_width') || '720');
 let theme = localStorage.getItem('reader_theme') || 'light';
 let currentFilePath = null;
 
@@ -591,7 +585,6 @@ const bookInfo = $('#bookInfo');
 const progressBar = $('#progressBar');
 const progressText = $('#progressText');
 const fontSizeLabel = $('#fontSizeLabel');
-const widthLabel = $('#widthLabel');
 const btnTheme = $('#btnTheme');
 const readerContainer = $('#readerContainer');
 const fileInput = $('#fileInput');
@@ -717,16 +710,9 @@ async function init() {
 
   var isMobile = window.innerWidth <= 480;
   if (isMobile && !localStorage.getItem('reader_fontSize')) { fontSize = 17; }
-  if (isMobile && !localStorage.getItem('reader_width')) { readerWidth = Math.floor(window.innerWidth * 0.92); }
 
   reader.style.fontSize = fontSize + 'px';
   fontSizeLabel.textContent = fontSize + 'px';
-  reader.style.setProperty('--reader-width', readerWidth + 'px');
-  if (isMobile) {
-    reader.style.width = readerWidth + 'px';
-    reader.style.maxWidth = readerWidth + 'px';
-  }
-  widthLabel.textContent = isMobile ? '自适应' : (readerWidth + 'px');
 
   // Render shelf
   await renderShelf();
@@ -1041,19 +1027,6 @@ function changeFontSize(delta) {
   localStorage.setItem('reader_fontSize', fontSize);
 }
 
-// ============ Width ============
-function changeWidth(delta) {
-  readerWidth = Math.max(400, Math.min(1200, readerWidth + delta));
-  reader.style.setProperty('--reader-width', readerWidth + 'px');
-  // On mobile, set inline styles to beat media query CSS
-  if (window.innerWidth <= 480) {
-    reader.style.width = readerWidth + 'px';
-    reader.style.maxWidth = readerWidth + 'px';
-  }
-  widthLabel.textContent = readerWidth + 'px';
-  localStorage.setItem('reader_width', readerWidth);
-}
-
 // ============ Sidebar ============
 function toggleSidebar() {
   var sidebar = $('#sidebar');
@@ -1290,12 +1263,6 @@ document.addEventListener('keydown', (e) => {
       break;
     case '-':
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeFontSize(-1); }
-      break;
-    case '[':
-      if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeWidth(-40); }
-      break;
-    case ']':
-      if (e.ctrlKey || e.metaKey) { e.preventDefault(); changeWidth(40); }
       break;
     case 'b':
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); toggleSidebar(); }
