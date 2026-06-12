@@ -1058,6 +1058,8 @@ function jumpToChapter(idx, save) {
 // Scroll detection: auto-append next chapter, update current chapter
 var scrollTimer = null;
 var toolbarVisible = true;
+var toolbarJustShown = false;
+var toolbarShowTimer = null;
 
 function showToolbar() {
   var toolbar = document.getElementById('toolbar');
@@ -1065,6 +1067,11 @@ function showToolbar() {
   toolbar.classList.remove('hidden-bar');
   if (progBar) progBar.classList.remove('hidden-bar');
   toolbarVisible = true;
+  // Prevent scroll handler from immediately hiding it
+  // (toolbar appearing pushes content down, which triggers a scroll event)
+  toolbarJustShown = true;
+  clearTimeout(toolbarShowTimer);
+  toolbarShowTimer = setTimeout(function() { toolbarJustShown = false; }, 500);
 }
 
 function hideToolbar() {
@@ -1073,11 +1080,12 @@ function hideToolbar() {
   toolbar.classList.add('hidden-bar');
   if (progBar) progBar.classList.add('hidden-bar');
   toolbarVisible = false;
+  toolbarJustShown = false;
 }
 
 readerContainer.addEventListener('scroll', function() {
   // Always hide toolbar on scroll (any direction) past threshold
-  if (readerContainer.scrollTop > 30 && toolbarVisible) {
+  if (readerContainer.scrollTop > 30 && toolbarVisible && !toolbarJustShown) {
     hideToolbar();
   }
 
