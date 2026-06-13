@@ -6,12 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f5f0e8" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)"><meta name="color-scheme" content="light dark">
 <meta name="x5-fullscreen" content="true">
 <meta name="full-screen" content="yes">
-<meta name="browsermode" content="application">
-<meta name="theme-color" content="#f5f0e8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
-<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.json">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -51,23 +48,22 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  html {
-    background: var(--bg);
-    transition: background var(--transition);
-    overflow-y: auto;
-  }
+  html { background: var(--bg); }
+  html:-webkit-full-screen { background: var(--bg); }
+  html:fullscreen { background: var(--bg); }
 
   body {
     font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
     transition: background var(--transition), color var(--transition);
   }
 
   /* ========== Sidebar ========== */
   .sidebar {
-    position: fixed;
-    top: 0; left: 0; bottom: 0;
     width: 280px;
     min-width: 280px;
     background: var(--sidebar-bg);
@@ -75,11 +71,9 @@
     display: flex;
     flex-direction: column;
     transition: transform var(--transition), background var(--transition);
-    z-index: 20;
+    z-index: 10;
   }
-  .sidebar.hidden { transform: translateX(-100%); }
-
-  body.sidebar-closed .main { margin-left: 0; }
+  .sidebar.hidden { transform: translateX(-280px); min-width: 0; width: 0; pointer-events: none; }
 
   .sidebar-header {
     padding: 20px 16px;
@@ -270,35 +264,31 @@
 
   /* ========== Main ========== */
   .main {
-    margin-left: 280px;
-    min-height: 100vh;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-  }
-
-  /* ===== Toolbar sticky wrapper ===== */
-  .toolbar-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--card-bg);
-    transition: background var(--transition);
   }
 
   .toolbar {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px 16px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border);
+    background: var(--card-bg);
     flex-wrap: wrap;
+    max-height: 100px;
+    transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, border-color 0.3s ease, background var(--transition);
   }
-  .toolbar-sticky.hidden-bar {
+  .toolbar.hidden-bar {
     max-height: 0;
-    overflow: hidden;
-  }
-  .toolbar-sticky.hidden-bar .toolbar {
     opacity: 0;
     pointer-events: none;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    overflow: hidden;
   }
 
   .toolbar button, .toolbar .btn-file {
@@ -348,12 +338,14 @@
 
   /* ========== Reader Area ========== */
   .reader-container {
-    padding: 40px 20px 80px;
-    overflow: visible;
+    flex: 1;
+    overflow-y: auto;
     display: flex;
     justify-content: center;
+    padding: 40px 20px 80px;
   }
-  .reader-container::-webkit-scrollbar { width: 0; }
+  .reader-container::-webkit-scrollbar { width: 6px; }
+  .reader-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
 
   .reader {
     --reader-width: 720px;
@@ -444,7 +436,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 80vh;
+    height: 100%;
     text-align: center;
     color: var(--text-secondary);
     user-select: none;
@@ -473,6 +465,13 @@
     height: 3px;
     background: var(--border);
     position: relative;
+    max-height: 3px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+  }
+  .progress-bar-container.hidden-bar {
+    max-height: 0;
+    opacity: 0;
   }
   .progress-bar-fill {
     height: 100%;
@@ -501,12 +500,12 @@
 
   /* ========== @media (tablet) ========== */
   @media (max-width: 768px) {
-    .main { margin-left: 0; }
     .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; z-index: 20;
       width: 75vw; min-width: 75vw;
       box-shadow: 4px 0 24px rgba(0,0,0,0.15);
     }
-    .sidebar.hidden { transform: translateX(-75vw); }
+    .sidebar.hidden { transform: translateX(-75vw); min-width: 75vw; width: 75vw; pointer-events: none; }
     .sidebar-backdrop.visible { display: block; opacity: 1; }
     .sidebar-close-btn { display: inline-block; }
     .reader { font-size: 16px; }
@@ -518,7 +517,7 @@
   /* ========== @media (phone, <480px) ========== */
   @media (max-width: 480px) {
     .sidebar { width: 72vw; min-width: 72vw; border-right: none; }
-    .sidebar.hidden { transform: translateX(-72vw); }
+    .sidebar.hidden { transform: translateX(-72vw); min-width: 72vw; width: 72vw; pointer-events: none; }
     .sidebar-header { padding: 14px 12px; }
     .sidebar-header h1 { font-size: 1em; }
     .sidebar-close-btn { display: inline-block; }
@@ -558,9 +557,10 @@
     .reader-container { padding-bottom: 20px; }
   }
 
+  /* ========== @media (small phone, <380px) ========== */
   @media (max-width: 380px) {
     .sidebar { width: 78vw; min-width: 78vw; }
-    .sidebar.hidden { transform: translateX(-78vw); }
+    .sidebar.hidden { transform: translateX(-78vw); min-width: 78vw; width: 78vw; pointer-events: none; }
     .toolbar button, .toolbar .btn-file { padding: 6px 5px; font-size: 0.65em; }
     .reader { font-size: 16px; line-height: 1.95; width: 92vw; max-width: 92vw; }
     .reader-container { padding: 12px 0 90px; }
@@ -607,25 +607,23 @@
 
 <!-- Main -->
 <div class="main">
-  <div class="toolbar-sticky" id="toolbarSticky">
-    <div class="toolbar" id="toolbar">
-      <button onclick="toggleSidebar()" title="目录">📋 目录</button>
-      <label class="btn-file">
-        📂 打开
-        <input type="file" accept=".txt" id="fileInput" hidden onchange="handleFile(this.files[0])">
-      </label>
-      <span class="spacer"></span>
-      <div class="font-size-group">
-        <button onclick="changeFontSize(-1)" title="缩小字体">A-</button>
-        <span class="font-size-label" id="fontSizeLabel">18px</span>
-        <button onclick="changeFontSize(1)" title="放大字体">A+</button>
-      </div>
-      <button id="btnTheme" onclick="toggleTheme()" title="切换主题">🌙</button>
-      <span class="progress-text" id="progressText"></span>
+  <div class="toolbar" id="toolbar">
+    <button onclick="toggleSidebar()" title="目录">📋 目录</button>
+    <label class="btn-file">
+      📂 打开
+      <input type="file" accept=".txt" id="fileInput" hidden onchange="handleFile(this.files[0])">
+    </label>
+    <span class="spacer"></span>
+    <div class="font-size-group">
+      <button onclick="changeFontSize(-1)" title="缩小字体">A-</button>
+      <span class="font-size-label" id="fontSizeLabel">18px</span>
+      <button onclick="changeFontSize(1)" title="放大字体">A+</button>
     </div>
-    <div class="progress-bar-container">
-      <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
-    </div>
+    <button id="btnTheme" onclick="toggleTheme()" title="切换主题">🌙</button>
+    <span class="progress-text" id="progressText"></span>
+  </div>
+  <div class="progress-bar-container">
+    <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
   </div>
 
   <div class="reader-container" id="readerContainer">
@@ -788,14 +786,14 @@ async function dbDelete(id) {
 
 // ============ Init ============
 function setThemeColor() {
-  // Update the manual theme-color meta (override system preference)
-  var meta = document.querySelector('meta[name="theme-color"]:not([media])');
-  if (!meta) {
-    meta = document.createElement('meta');
-    meta.name = 'theme-color';
-    document.head.appendChild(meta);
+  var mc = document.getElementById('meta-theme-runtime');
+  if (!mc) {
+    mc = document.createElement('meta');
+    mc.name = 'theme-color';
+    mc.id = 'meta-theme-runtime';
+    document.head.appendChild(mc);
   }
-  meta.content = theme === 'dark' ? '#1a1a1a' : '#f5f0e8';
+  mc.content = theme === 'dark' ? '#1a1a1a' : '#f5f0e8';
 }
 
 async function init() {
@@ -1045,7 +1043,7 @@ function renderChapter(idx) {
   currentChapter = idx;
   lastLoadedChapter = idx;
   reader.innerHTML = formatChapterContent(idx);
-  window.scrollTo(0, 0);
+  readerContainer.scrollTop = 0;
   tocEl.querySelectorAll('.toc-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
   updateProgress();
   saveState();
@@ -1072,65 +1070,40 @@ function jumpToChapter(idx, save) {
   currentChapter = idx;
   lastLoadedChapter = idx;
   reader.innerHTML = formatChapterContent(idx);
-  window.scrollTo(0, 0);
+  readerContainer.scrollTop = 0;
   tocEl.querySelectorAll('.toc-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
   updateProgress();
   if (save) saveState();
   if (window.innerWidth <= 768) closeSidebar();
 }
 
-// ============ Toolbar + Fullscreen ============
+// Scroll detection: auto-append next chapter, update current chapter
 var toolbarVisible = true;
 
-function isFullscreen() {
-  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-}
-
-function enterFullscreen() {
-  setThemeColor();
-  var opts = { navigationUI: 'hide' };
-  var el = document.documentElement;
-  var fn = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!fn) { el = document.body; fn = el.requestFullscreen || el.webkitRequestFullscreen; }
-  if (!fn) { showToast('💡 添加到桌面可隐藏浏览器栏'); return; }
-  try {
-    var p = fn.call(el, opts);
-    if (p && p.catch) p.catch(function() {
-      if (el === document.documentElement) {
-        var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
-        if (fb) fb.call(document.body, opts).catch(function(){ showToast('💡 添加到桌面可隐藏浏览器栏'); });
-      }
-    });
-  } catch(e) { showToast('💡 添加到桌面可隐藏浏览器栏'); }
-}
-
-function exitFullscreen() {
-  var fn = document.exitFullscreen || document.webkitExitFullscreen;
-  if (fn) { try { fn.call(document); } catch(e) {} }
-}
-
 function showToolbar() {
-  document.getElementById('toolbarSticky').classList.remove('hidden-bar');
+  var toolbar = document.getElementById('toolbar');
+  var progBar = document.querySelector('.progress-bar-container');
+  toolbar.classList.remove('hidden-bar');
+  if (progBar) progBar.classList.remove('hidden-bar');
   toolbarVisible = true;
 }
 
 function hideToolbar() {
-  document.getElementById('toolbarSticky').classList.add('hidden-bar');
+  var toolbar = document.getElementById('toolbar');
+  var progBar = document.querySelector('.progress-bar-container');
+  toolbar.classList.add('hidden-bar');
+  if (progBar) progBar.classList.add('hidden-bar');
   toolbarVisible = false;
 }
 
-document.addEventListener('fullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
-document.addEventListener('webkitfullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
-
-// ============ Scroll: toolbar hide + chapter tracking ============
-window.addEventListener('scroll', function() {
-  if (window.scrollY > 30 && toolbarVisible) hideToolbar();
+readerContainer.addEventListener('scroll', function() {
+  if (readerContainer.scrollTop > 30 && toolbarVisible) hideToolbar();
   if (!currentBook || chapters.length === 0) return;
 
   var blocks = reader.querySelectorAll('.chapter-block');
   for (var i = 0; i < blocks.length; i++) {
     var rect = blocks[i].getBoundingClientRect();
-    if (rect.top < window.innerHeight * 0.5 && rect.bottom > 0) {
+    if (rect.top < readerContainer.clientHeight * 0.5 && rect.bottom > 0) {
       var chIdx = parseInt(blocks[i].getAttribute('data-ch'), 10);
       if (!isNaN(chIdx) && chIdx !== currentChapter) {
         currentChapter = chIdx;
@@ -1142,11 +1115,11 @@ window.addEventListener('scroll', function() {
   }
   updateProgress();
 
-  var distFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-  if (distFromBottom < 600) appendNextChapter();
-});
+  var distFromBottom = readerContainer.scrollHeight - readerContainer.scrollTop - readerContainer.clientHeight;
+  if (distFromBottom < 300) appendNextChapter();
+}, { passive: true });
 
-// Tap middle of screen → toggle toolbar + fullscreen
+// Tap middle → toggle between toolbar and immersive fullscreen
 readerContainer.addEventListener('click', function(e) {
   if (e.target.closest('button,a,label,input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
@@ -1161,7 +1134,7 @@ readerContainer.addEventListener('click', function(e) {
   } else if (toolbarVisible && currentBook) {
     hideToolbar();
     enterFullscreen();
-  } else if (!toolbarVisible && currentBook) {
+  } else if (currentBook) {
     enterFullscreen();
   } else {
     if (toolbarVisible) hideToolbar(); else showToolbar();
@@ -1175,29 +1148,51 @@ function hideBottomNav() {}
 function updateProgress() {
   if (!currentBook || chapters.length === 0) return;
 
-  var block = reader.querySelector('.chapter-block[data-ch="' + currentChapter + '"]');
-  var chProgress = 0;
-  if (block) {
-    var rect = block.getBoundingClientRect();
-    chProgress = Math.max(0, Math.min(1, 1 - rect.bottom / (rect.height + window.innerHeight)));
-  }
+  // Estimate reading progress based on character position
+  const start = chapters[currentChapter].index;
+  const end = currentChapter + 1 < chapters.length
+    ? chapters[currentChapter + 1].index
+    : currentBook.length;
+  const chapterProgress = readerContainer.scrollTop / (readerContainer.scrollHeight - readerContainer.clientHeight) || 0;
 
-  var start = chapters[currentChapter].index;
-  var end = currentChapter + 1 < chapters.length ? chapters[currentChapter + 1].index : currentBook.length;
-  var overallStart = start / currentBook.length;
-  var overallEnd = end / currentBook.length;
-  var overall = overallStart + chProgress * (overallEnd - overallStart);
+  const overallStart = chapters[currentChapter].index / currentBook.length;
+  const overallEnd = end / currentBook.length;
+  const overall = overallStart + chapterProgress * (overallEnd - overallStart);
 
-  var pct = Math.min(100, Math.round(overall * 100));
+  const pct = Math.min(100, Math.round(overall * 100));
   progressBar.style.width = pct + '%';
   progressText.textContent = pct + '%';
 }
+
+readerContainer.addEventListener('scroll', updateProgress);
 
 // ============ Persistence ============
 function saveState() {
   if (!currentBook || !currentFilePath) return;
   dbSave(currentFilePath, currentBook, currentChapter);
 }
+
+// ============ Fullscreen (browser bar hiding) ============
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function enterFullscreen() {
+  setThemeColor();
+  var el = document.documentElement, fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!fn) { el = document.body; fn = el.requestFullscreen || el.webkitRequestFullscreen; }
+  if (!fn) return;
+  try { fn.call(el); } catch(e) {}
+}
+
+function exitFullscreen() {
+  var fn = document.exitFullscreen || document.webkitExitFullscreen;
+  if (fn) try { fn.call(document); } catch(e) {}
+}
+
+// Back button exits fullscreen → show toolbar
+document.addEventListener('fullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
+document.addEventListener('webkitfullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
 
 // ============ Theme ============
 function toggleTheme() {
@@ -1224,7 +1219,6 @@ function toggleSidebar() {
   if (isHidden) {
     sidebar.classList.remove('hidden');
     backdrop.classList.add('visible');
-    document.body.classList.remove('sidebar-closed');
   } else {
     closeSidebar();
   }
@@ -1234,7 +1228,6 @@ function closeSidebar() {
   var backdrop = $('#sidebarBackdrop');
   sidebar.classList.add('hidden');
   backdrop.classList.remove('visible');
-  document.body.classList.add('sidebar-closed');
 }
 // Swipe-right to open, swipe-left to close sidebar
 (function() {
@@ -1505,25 +1498,10 @@ function escapeHtml(str) {
 
 // ============ Service Worker for PWA ============
 if ('serviceWorker' in navigator) {
-  // Unregister old cache-first SW first, then register the new one
+  // Unregister any old SWs first, then register fresh
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) { r.unregister(); });
-  }).then(function() {
     return navigator.serviceWorker.register('/novel-reader/sw.js');
-  }).then(function(reg) {
-    // If an update is waiting, activate it and reload
-    if (reg.waiting) { reg.waiting.postMessage('skipWaiting'); }
-    reg.onupdatefound = function() {
-      var worker = reg.installing;
-      if (worker) {
-        worker.onstatechange = function() {
-          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-            // New content available — reload to use it
-            location.reload();
-          }
-        };
-      }
-    };
   }).catch(function(){});
 }
 
