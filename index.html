@@ -46,6 +46,10 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  /* Fullscreen status bar background — covers the black bar across browsers */
+  :root:-webkit-full-screen { background: var(--bg); }
+  :root:fullscreen { background: var(--bg); }
+
   html {
     background: var(--bg);
     transition: background var(--transition);
@@ -1075,8 +1079,25 @@ function jumpToChapter(idx, save) {
   if (window.innerWidth <= 768) closeSidebar();
 }
 
-// ============ Toolbar toggle logic ============
+// ============ Toolbar + Fullscreen toggle logic ============
 var toolbarVisible = true;
+
+// Fullscreen helpers
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+
+function enterFullscreen() {
+  setThemeColor(); // must be set BEFORE requesting — some browsers snapshot it here
+  var el = document.documentElement;
+  if (el.requestFullscreen) { el.requestFullscreen(); }
+  else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); }
+}
+
+function leaveFullscreen() {
+  if (document.exitFullscreen) { document.exitFullscreen(); }
+  else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+}
 
 function showToolbar() {
   var toolbar = document.getElementById('toolbar');
@@ -1094,6 +1115,14 @@ function hideToolbar() {
   toolbarVisible = false;
 }
 
+// If user exits fullscreen via back button / edge swipe → show toolbar
+document.addEventListener('fullscreenchange', function() {
+  if (!isFullscreen()) showToolbar();
+});
+document.addEventListener('webkitfullscreenchange', function() {
+  if (!isFullscreen()) showToolbar();
+});
+
 readerContainer.addEventListener('scroll', function() {
   // Hide toolbar on any scroll past threshold
   if (readerContainer.scrollTop > 30 && toolbarVisible) {
@@ -1104,7 +1133,6 @@ readerContainer.addEventListener('scroll', function() {
 
   // Detect which chapter is currently visible
   var blocks = reader.querySelectorAll('.chapter-block');
-  var containerTop = readerContainer.scrollTop;
   for (var i = 0; i < blocks.length; i++) {
     var rect = blocks[i].getBoundingClientRect();
     if (rect.top < readerContainer.clientHeight * 0.5 && rect.bottom > 0) {
@@ -1127,13 +1155,11 @@ readerContainer.addEventListener('scroll', function() {
   }
 }, { passive: true });
 
-// Tap middle of reader area → toggle toolbar
+// Tap middle of reader area → toggle: toolbar ↔ immersive fullscreen
 readerContainer.addEventListener('click', function(e) {
-  // Ignore clicks on interactive elements or during text selection
   if (e.target.closest('button') || e.target.closest('a') || e.target.closest('label') || e.target.closest('input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
 
-  // Only respond to taps in the middle 80% of the viewport
   var rect = readerContainer.getBoundingClientRect();
   var clickY = e.clientY - rect.top;
   var middleStart = rect.height * 0.1;
@@ -1141,9 +1167,16 @@ readerContainer.addEventListener('click', function(e) {
 
   if (clickY > middleStart && clickY < middleEnd) {
     if (toolbarVisible) {
+      // Enter immersive: hide toolbar, go fullscreen
       hideToolbar();
-    } else {
+      if (currentBook) enterFullscreen();
+    } else if (isFullscreen()) {
+      // Exit immersive: leave fullscreen, show toolbar
+      leaveFullscreen();
       showToolbar();
+    } else {
+      // Toolbar hidden, not fullscreen → enter fullscreen
+      if (currentBook) enterFullscreen();
     }
   }
 });
