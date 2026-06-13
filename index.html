@@ -6,7 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#f5f0e8">
+<meta name="theme-color" content="#f5f0e8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.json">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -46,10 +48,6 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  /* Fullscreen status bar background — covers the black bar across browsers */
-  :root:-webkit-full-screen { background: var(--bg); }
-  :root:fullscreen { background: var(--bg); }
-
   html {
     background: var(--bg);
     transition: background var(--transition);
@@ -59,9 +57,11 @@
     font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
-    height: 100vh;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex;
     overflow: hidden;
+    overscroll-behavior: none;
     transition: background var(--transition), color var(--transition);
   }
 
@@ -343,6 +343,7 @@
   .reader-container {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: none;
     display: flex;
     justify-content: center;
     padding: 40px 20px 80px;
@@ -1079,25 +1080,10 @@ function jumpToChapter(idx, save) {
   if (window.innerWidth <= 768) closeSidebar();
 }
 
-// ============ Toolbar + Fullscreen toggle logic ============
+// ============ Toolbar toggle logic ============
+// No Fullscreen API — it forces a black status bar on WebView-based browsers.
+// Instead: viewport-fit=cover + theme-color meta handle the edges naturally.
 var toolbarVisible = true;
-
-// Fullscreen helpers
-function isFullscreen() {
-  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-}
-
-function enterFullscreen() {
-  setThemeColor(); // must be set BEFORE requesting — some browsers snapshot it here
-  var el = document.documentElement;
-  if (el.requestFullscreen) { el.requestFullscreen(); }
-  else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); }
-}
-
-function leaveFullscreen() {
-  if (document.exitFullscreen) { document.exitFullscreen(); }
-  else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
-}
 
 function showToolbar() {
   var toolbar = document.getElementById('toolbar');
@@ -1114,14 +1100,6 @@ function hideToolbar() {
   if (progBar) progBar.classList.add('hidden-bar');
   toolbarVisible = false;
 }
-
-// If user exits fullscreen via back button / edge swipe → show toolbar
-document.addEventListener('fullscreenchange', function() {
-  if (!isFullscreen()) showToolbar();
-});
-document.addEventListener('webkitfullscreenchange', function() {
-  if (!isFullscreen()) showToolbar();
-});
 
 readerContainer.addEventListener('scroll', function() {
   // Hide toolbar on any scroll past threshold
@@ -1155,7 +1133,7 @@ readerContainer.addEventListener('scroll', function() {
   }
 }, { passive: true });
 
-// Tap middle of reader area → toggle: toolbar ↔ immersive fullscreen
+// Tap middle of reader area → toggle toolbar
 readerContainer.addEventListener('click', function(e) {
   if (e.target.closest('button') || e.target.closest('a') || e.target.closest('label') || e.target.closest('input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
@@ -1167,16 +1145,9 @@ readerContainer.addEventListener('click', function(e) {
 
   if (clickY > middleStart && clickY < middleEnd) {
     if (toolbarVisible) {
-      // Enter immersive: hide toolbar, go fullscreen
       hideToolbar();
-      if (currentBook) enterFullscreen();
-    } else if (isFullscreen()) {
-      // Exit immersive: leave fullscreen, show toolbar
-      leaveFullscreen();
-      showToolbar();
     } else {
-      // Toolbar hidden, not fullscreen → enter fullscreen
-      if (currentBook) enterFullscreen();
+      showToolbar();
     }
   }
 });
