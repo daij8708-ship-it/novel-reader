@@ -784,8 +784,19 @@ async function dbDelete(id) {
 }
 
 // ============ Init ============
+function setThemeColor() {
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = theme === 'dark' ? '#1a1a1a' : '#f5f0e8';
+}
+
 async function init() {
   document.documentElement.setAttribute('data-theme', theme);
+  setThemeColor();
   btnTheme.textContent = theme === 'dark' ? '☀️' : '🌙';
 
   var isMobile = window.innerWidth <= 480;
@@ -1220,6 +1231,7 @@ function saveState() {
 function toggleTheme() {
   theme = theme === 'light' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', theme);
+  setThemeColor();
   btnTheme.textContent = theme === 'dark' ? '☀️' : '🌙';
   localStorage.setItem('reader_theme', theme);
 }
@@ -1519,7 +1531,26 @@ function escapeHtml(str) {
 
 // ============ Service Worker for PWA ============
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/novel-reader/sw.js').catch(function(){});
+  // Unregister old cache-first SW first, then register the new one
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(r) { r.unregister(); });
+  }).then(function() {
+    return navigator.serviceWorker.register('/novel-reader/sw.js');
+  }).then(function(reg) {
+    // If an update is waiting, activate it and reload
+    if (reg.waiting) { reg.waiting.postMessage('skipWaiting'); }
+    reg.onupdatefound = function() {
+      var worker = reg.installing;
+      if (worker) {
+        worker.onstatechange = function() {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New content available — reload to use it
+            location.reload();
+          }
+        };
+      }
+    };
+  }).catch(function(){});
 }
 
 // ============ Start ============

@@ -1,24 +1,20 @@
-// Simple service worker for PWA install + offline support
-var CACHE = 'novel-reader-v1';
-var FILES = [
-  '/novel-reader/',
-  '/novel-reader/index.html',
-  '/novel-reader/manifest.json',
-  '/novel-reader/icon.svg'
-];
-
+// Minimal service worker — only for PWA install trigger, no page caching
+// (index.html changes frequently; caching it blocks updates)
 self.addEventListener('install', function(e) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(e) {
+  // Clear all old caches
   e.waitUntil(
-    caches.open(CACHE).then(function(cache) {
-      return cache.addAll(FILES);
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     })
   );
+  e.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', function(e) {
-  e.respondWith(
-    caches.match(e.request).then(function(r) {
-      return r || fetch(e.request);
-    })
-  );
+  // Pass through — never cache, always fetch from network
+  e.respondWith(fetch(e.request));
 });
