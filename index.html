@@ -54,22 +54,20 @@
   html {
     background: var(--bg);
     transition: background var(--transition);
+    overflow-y: auto;
   }
 
   body {
     font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    display: flex;
-    overflow: hidden;
-    overscroll-behavior: none;
     transition: background var(--transition), color var(--transition);
   }
 
   /* ========== Sidebar ========== */
   .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
     width: 280px;
     min-width: 280px;
     background: var(--sidebar-bg);
@@ -77,9 +75,11 @@
     display: flex;
     flex-direction: column;
     transition: transform var(--transition), background var(--transition);
-    z-index: 10;
+    z-index: 20;
   }
-  .sidebar.hidden { transform: translateX(-280px); min-width: 0; width: 0; pointer-events: none; }
+  .sidebar.hidden { transform: translateX(-100%); }
+
+  body.sidebar-closed .main { margin-left: 0; }
 
   .sidebar-header {
     padding: 20px 16px;
@@ -270,10 +270,18 @@
 
   /* ========== Main ========== */
   .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+    margin-left: 280px;
+    min-height: 100vh;
     min-width: 0;
+  }
+
+  /* ===== Toolbar sticky wrapper ===== */
+  .toolbar-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--card-bg);
+    transition: background var(--transition);
   }
 
   .toolbar {
@@ -282,19 +290,15 @@
     gap: 6px;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px 16px;
     border-bottom: 1px solid var(--border);
-    background: var(--card-bg);
     flex-wrap: wrap;
-    max-height: 100px;
-    transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, border-color 0.3s ease, background var(--transition);
   }
-  .toolbar.hidden-bar {
+  .toolbar-sticky.hidden-bar {
     max-height: 0;
+    overflow: hidden;
+  }
+  .toolbar-sticky.hidden-bar .toolbar {
     opacity: 0;
     pointer-events: none;
-    padding-top: 0;
-    padding-bottom: 0;
-    border-bottom-color: transparent;
-    overflow: hidden;
   }
 
   .toolbar button, .toolbar .btn-file {
@@ -344,15 +348,12 @@
 
   /* ========== Reader Area ========== */
   .reader-container {
-    flex: 1;
-    overflow-y: auto;
-    overscroll-behavior: none;
+    padding: 40px 20px 80px;
+    overflow: visible;
     display: flex;
     justify-content: center;
-    padding: 40px 20px 80px;
   }
-  .reader-container::-webkit-scrollbar { width: 6px; }
-  .reader-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  .reader-container::-webkit-scrollbar { width: 0; }
 
   .reader {
     --reader-width: 720px;
@@ -443,7 +444,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    min-height: 80vh;
     text-align: center;
     color: var(--text-secondary);
     user-select: none;
@@ -472,13 +473,6 @@
     height: 3px;
     background: var(--border);
     position: relative;
-    max-height: 3px;
-    overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
-  }
-  .progress-bar-container.hidden-bar {
-    max-height: 0;
-    opacity: 0;
   }
   .progress-bar-fill {
     height: 100%;
@@ -507,12 +501,12 @@
 
   /* ========== @media (tablet) ========== */
   @media (max-width: 768px) {
+    .main { margin-left: 0; }
     .sidebar {
-      position: fixed; left: 0; top: 0; bottom: 0; z-index: 20;
       width: 75vw; min-width: 75vw;
       box-shadow: 4px 0 24px rgba(0,0,0,0.15);
     }
-    .sidebar.hidden { transform: translateX(-75vw); min-width: 75vw; width: 75vw; pointer-events: none; }
+    .sidebar.hidden { transform: translateX(-75vw); }
     .sidebar-backdrop.visible { display: block; opacity: 1; }
     .sidebar-close-btn { display: inline-block; }
     .reader { font-size: 16px; }
@@ -524,7 +518,7 @@
   /* ========== @media (phone, <480px) ========== */
   @media (max-width: 480px) {
     .sidebar { width: 72vw; min-width: 72vw; border-right: none; }
-    .sidebar.hidden { transform: translateX(-72vw); min-width: 72vw; width: 72vw; pointer-events: none; }
+    .sidebar.hidden { transform: translateX(-72vw); }
     .sidebar-header { padding: 14px 12px; }
     .sidebar-header h1 { font-size: 1em; }
     .sidebar-close-btn { display: inline-block; }
@@ -564,10 +558,9 @@
     .reader-container { padding-bottom: 20px; }
   }
 
-  /* ========== @media (small phone, <380px) ========== */
   @media (max-width: 380px) {
     .sidebar { width: 78vw; min-width: 78vw; }
-    .sidebar.hidden { transform: translateX(-78vw); min-width: 78vw; width: 78vw; pointer-events: none; }
+    .sidebar.hidden { transform: translateX(-78vw); }
     .toolbar button, .toolbar .btn-file { padding: 6px 5px; font-size: 0.65em; }
     .reader { font-size: 16px; line-height: 1.95; width: 92vw; max-width: 92vw; }
     .reader-container { padding: 12px 0 90px; }
@@ -614,23 +607,25 @@
 
 <!-- Main -->
 <div class="main">
-  <div class="toolbar" id="toolbar">
-    <button onclick="toggleSidebar()" title="目录">📋 目录</button>
-    <label class="btn-file">
-      📂 打开
-      <input type="file" accept=".txt" id="fileInput" hidden onchange="handleFile(this.files[0])">
-    </label>
-    <span class="spacer"></span>
-    <div class="font-size-group">
-      <button onclick="changeFontSize(-1)" title="缩小字体">A-</button>
-      <span class="font-size-label" id="fontSizeLabel">18px</span>
-      <button onclick="changeFontSize(1)" title="放大字体">A+</button>
+  <div class="toolbar-sticky" id="toolbarSticky">
+    <div class="toolbar" id="toolbar">
+      <button onclick="toggleSidebar()" title="目录">📋 目录</button>
+      <label class="btn-file">
+        📂 打开
+        <input type="file" accept=".txt" id="fileInput" hidden onchange="handleFile(this.files[0])">
+      </label>
+      <span class="spacer"></span>
+      <div class="font-size-group">
+        <button onclick="changeFontSize(-1)" title="缩小字体">A-</button>
+        <span class="font-size-label" id="fontSizeLabel">18px</span>
+        <button onclick="changeFontSize(1)" title="放大字体">A+</button>
+      </div>
+      <button id="btnTheme" onclick="toggleTheme()" title="切换主题">🌙</button>
+      <span class="progress-text" id="progressText"></span>
     </div>
-    <button id="btnTheme" onclick="toggleTheme()" title="切换主题">🌙</button>
-    <span class="progress-text" id="progressText"></span>
-  </div>
-  <div class="progress-bar-container">
-    <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+    <div class="progress-bar-container">
+      <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+    </div>
   </div>
 
   <div class="reader-container" id="readerContainer">
@@ -793,7 +788,8 @@ async function dbDelete(id) {
 
 // ============ Init ============
 function setThemeColor() {
-  var meta = document.querySelector('meta[name="theme-color"]');
+  // Update the manual theme-color meta (override system preference)
+  var meta = document.querySelector('meta[name="theme-color"]:not([media])');
   if (!meta) {
     meta = document.createElement('meta');
     meta.name = 'theme-color';
@@ -1049,7 +1045,7 @@ function renderChapter(idx) {
   currentChapter = idx;
   lastLoadedChapter = idx;
   reader.innerHTML = formatChapterContent(idx);
-  readerContainer.scrollTop = 0;
+  window.scrollTo(0, 0);
   tocEl.querySelectorAll('.toc-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
   updateProgress();
   saveState();
@@ -1076,14 +1072,14 @@ function jumpToChapter(idx, save) {
   currentChapter = idx;
   lastLoadedChapter = idx;
   reader.innerHTML = formatChapterContent(idx);
-  readerContainer.scrollTop = 0;
+  window.scrollTo(0, 0);
   tocEl.querySelectorAll('.toc-item').forEach(function(el, i) { el.classList.toggle('active', i === idx); });
   updateProgress();
   if (save) saveState();
   if (window.innerWidth <= 768) closeSidebar();
 }
 
-// ============ Toolbar + Fullscreen toggle ============
+// ============ Toolbar + Fullscreen ============
 var toolbarVisible = true;
 
 function isFullscreen() {
@@ -1095,35 +1091,17 @@ function enterFullscreen() {
   var opts = { navigationUI: 'hide' };
   var el = document.documentElement;
   var fn = el.requestFullscreen || el.webkitRequestFullscreen;
-
-  if (!fn) {
-    // Try body as fallback (some Chinese browsers only support body)
-    el = document.body;
-    fn = el.requestFullscreen || el.webkitRequestFullscreen;
-  }
-  if (!fn) {
-    showToast('💡 添加到桌面可隐藏浏览器栏');
-    return;
-  }
-
+  if (!fn) { el = document.body; fn = el.requestFullscreen || el.webkitRequestFullscreen; }
+  if (!fn) { showToast('💡 添加到桌面可隐藏浏览器栏'); return; }
   try {
     var p = fn.call(el, opts);
-    if (p && p.catch) {
-      p.catch(function() {
-        // Fullscreen rejected — try body if we tried root first
-        if (el === document.documentElement) {
-          var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
-          if (fb) fb.call(document.body, opts).catch(function() {
-            showToast('💡 添加到桌面可隐藏浏览器栏');
-          });
-        } else {
-          showToast('💡 添加到桌面可隐藏浏览器栏');
-        }
-      });
-    }
-  } catch(e) {
-    showToast('💡 添加到桌面可隐藏浏览器栏');
-  }
+    if (p && p.catch) p.catch(function() {
+      if (el === document.documentElement) {
+        var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
+        if (fb) fb.call(document.body, opts).catch(function(){ showToast('💡 添加到桌面可隐藏浏览器栏'); });
+      }
+    });
+  } catch(e) { showToast('💡 添加到桌面可隐藏浏览器栏'); }
 }
 
 function exitFullscreen() {
@@ -1132,31 +1110,27 @@ function exitFullscreen() {
 }
 
 function showToolbar() {
-  document.getElementById('toolbar').classList.remove('hidden-bar');
-  var pb = document.querySelector('.progress-bar-container');
-  if (pb) pb.classList.remove('hidden-bar');
+  document.getElementById('toolbarSticky').classList.remove('hidden-bar');
   toolbarVisible = true;
 }
 
 function hideToolbar() {
-  document.getElementById('toolbar').classList.add('hidden-bar');
-  var pb = document.querySelector('.progress-bar-container');
-  if (pb) pb.classList.add('hidden-bar');
+  document.getElementById('toolbarSticky').classList.add('hidden-bar');
   toolbarVisible = false;
 }
 
-// Back button / edge-swipe exits fullscreen → show toolbar
 document.addEventListener('fullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
 document.addEventListener('webkitfullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
 
-readerContainer.addEventListener('scroll', function() {
-  if (readerContainer.scrollTop > 30 && toolbarVisible) hideToolbar();
+// ============ Scroll: toolbar hide + chapter tracking ============
+window.addEventListener('scroll', function() {
+  if (window.scrollY > 30 && toolbarVisible) hideToolbar();
   if (!currentBook || chapters.length === 0) return;
 
   var blocks = reader.querySelectorAll('.chapter-block');
   for (var i = 0; i < blocks.length; i++) {
     var rect = blocks[i].getBoundingClientRect();
-    if (rect.top < readerContainer.clientHeight * 0.5 && rect.bottom > 0) {
+    if (rect.top < window.innerHeight * 0.5 && rect.bottom > 0) {
       var chIdx = parseInt(blocks[i].getAttribute('data-ch'), 10);
       if (!isNaN(chIdx) && chIdx !== currentChapter) {
         currentChapter = chIdx;
@@ -1168,11 +1142,11 @@ readerContainer.addEventListener('scroll', function() {
   }
   updateProgress();
 
-  var distFromBottom = readerContainer.scrollHeight - readerContainer.scrollTop - readerContainer.clientHeight;
-  if (distFromBottom < 300) appendNextChapter();
-}, { passive: true });
+  var distFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+  if (distFromBottom < 600) appendNextChapter();
+});
 
-// Tap middle of screen → toggle between toolbar mode and immersive fullscreen
+// Tap middle of screen → toggle toolbar + fullscreen
 readerContainer.addEventListener('click', function(e) {
   if (e.target.closest('button,a,label,input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
@@ -1182,18 +1156,14 @@ readerContainer.addEventListener('click', function(e) {
   if (y < rect.height * 0.1 || y > rect.height * 0.9) return;
 
   if (isFullscreen()) {
-    // In fullscreen → exit, show toolbar
     exitFullscreen();
     showToolbar();
   } else if (toolbarVisible && currentBook) {
-    // Toolbar showing → hide it, go fullscreen
     hideToolbar();
     enterFullscreen();
   } else if (!toolbarVisible && currentBook) {
-    // Toolbar hidden → go fullscreen
     enterFullscreen();
   } else {
-    // No book loaded → just toggle toolbar
     if (toolbarVisible) hideToolbar(); else showToolbar();
   }
 });
@@ -1205,23 +1175,23 @@ function hideBottomNav() {}
 function updateProgress() {
   if (!currentBook || chapters.length === 0) return;
 
-  // Estimate reading progress based on character position
-  const start = chapters[currentChapter].index;
-  const end = currentChapter + 1 < chapters.length
-    ? chapters[currentChapter + 1].index
-    : currentBook.length;
-  const chapterProgress = readerContainer.scrollTop / (readerContainer.scrollHeight - readerContainer.clientHeight) || 0;
+  var block = reader.querySelector('.chapter-block[data-ch="' + currentChapter + '"]');
+  var chProgress = 0;
+  if (block) {
+    var rect = block.getBoundingClientRect();
+    chProgress = Math.max(0, Math.min(1, 1 - rect.bottom / (rect.height + window.innerHeight)));
+  }
 
-  const overallStart = chapters[currentChapter].index / currentBook.length;
-  const overallEnd = end / currentBook.length;
-  const overall = overallStart + chapterProgress * (overallEnd - overallStart);
+  var start = chapters[currentChapter].index;
+  var end = currentChapter + 1 < chapters.length ? chapters[currentChapter + 1].index : currentBook.length;
+  var overallStart = start / currentBook.length;
+  var overallEnd = end / currentBook.length;
+  var overall = overallStart + chProgress * (overallEnd - overallStart);
 
-  const pct = Math.min(100, Math.round(overall * 100));
+  var pct = Math.min(100, Math.round(overall * 100));
   progressBar.style.width = pct + '%';
   progressText.textContent = pct + '%';
 }
-
-readerContainer.addEventListener('scroll', updateProgress);
 
 // ============ Persistence ============
 function saveState() {
@@ -1254,6 +1224,7 @@ function toggleSidebar() {
   if (isHidden) {
     sidebar.classList.remove('hidden');
     backdrop.classList.add('visible');
+    document.body.classList.remove('sidebar-closed');
   } else {
     closeSidebar();
   }
@@ -1263,6 +1234,7 @@ function closeSidebar() {
   var backdrop = $('#sidebarBackdrop');
   sidebar.classList.add('hidden');
   backdrop.classList.remove('visible');
+  document.body.classList.add('sidebar-closed');
 }
 // Swipe-right to open, swipe-left to close sidebar
 (function() {
