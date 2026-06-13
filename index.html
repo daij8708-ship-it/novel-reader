@@ -1080,36 +1080,45 @@ function jumpToChapter(idx, save) {
   if (window.innerWidth <= 768) closeSidebar();
 }
 
-// ============ Toolbar toggle logic ============
-// No Fullscreen API — it forces a black status bar on WebView-based browsers.
-// Instead: viewport-fit=cover + theme-color meta handle the edges naturally.
+// ============ Toolbar + Fullscreen toggle ============
 var toolbarVisible = true;
 
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+
+function enterFullscreen() {
+  setThemeColor();
+  var el = document.documentElement;
+  (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+}
+
+function exitFullscreen() {
+  (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+}
+
 function showToolbar() {
-  var toolbar = document.getElementById('toolbar');
-  var progBar = document.querySelector('.progress-bar-container');
-  toolbar.classList.remove('hidden-bar');
-  if (progBar) progBar.classList.remove('hidden-bar');
+  document.getElementById('toolbar').classList.remove('hidden-bar');
+  var pb = document.querySelector('.progress-bar-container');
+  if (pb) pb.classList.remove('hidden-bar');
   toolbarVisible = true;
 }
 
 function hideToolbar() {
-  var toolbar = document.getElementById('toolbar');
-  var progBar = document.querySelector('.progress-bar-container');
-  toolbar.classList.add('hidden-bar');
-  if (progBar) progBar.classList.add('hidden-bar');
+  document.getElementById('toolbar').classList.add('hidden-bar');
+  var pb = document.querySelector('.progress-bar-container');
+  if (pb) pb.classList.add('hidden-bar');
   toolbarVisible = false;
 }
 
-readerContainer.addEventListener('scroll', function() {
-  // Hide toolbar on any scroll past threshold
-  if (readerContainer.scrollTop > 30 && toolbarVisible) {
-    hideToolbar();
-  }
+// Back button / edge-swipe exits fullscreen → show toolbar
+document.addEventListener('fullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
+document.addEventListener('webkitfullscreenchange', function() { if (!isFullscreen()) showToolbar(); });
 
+readerContainer.addEventListener('scroll', function() {
+  if (readerContainer.scrollTop > 30 && toolbarVisible) hideToolbar();
   if (!currentBook || chapters.length === 0) return;
 
-  // Detect which chapter is currently visible
   var blocks = reader.querySelectorAll('.chapter-block');
   for (var i = 0; i < blocks.length; i++) {
     var rect = blocks[i].getBoundingClientRect();
@@ -1123,32 +1132,32 @@ readerContainer.addEventListener('scroll', function() {
       break;
     }
   }
-
   updateProgress();
 
-  // Auto-append next chapter when near bottom (within 300px)
   var distFromBottom = readerContainer.scrollHeight - readerContainer.scrollTop - readerContainer.clientHeight;
-  if (distFromBottom < 300) {
-    appendNextChapter();
-  }
+  if (distFromBottom < 300) appendNextChapter();
 }, { passive: true });
 
-// Tap middle of reader area → toggle toolbar
+// Tap middle → cycle: show-toolbar → immersive-fullscreen → show-toolbar → ...
 readerContainer.addEventListener('click', function(e) {
-  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('label') || e.target.closest('input')) return;
+  if (e.target.closest('button,a,label,input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
 
   var rect = readerContainer.getBoundingClientRect();
   var clickY = e.clientY - rect.top;
-  var middleStart = rect.height * 0.1;
-  var middleEnd = rect.height * 0.9;
+  if (clickY < rect.height * 0.1 || clickY > rect.height * 0.9) return;
 
-  if (clickY > middleStart && clickY < middleEnd) {
-    if (toolbarVisible) {
-      hideToolbar();
-    } else {
-      showToolbar();
-    }
+  if (isFullscreen()) {
+    // Currently immersive → exit, show toolbar
+    exitFullscreen();
+    showToolbar();
+  } else if (toolbarVisible) {
+    // Toolbar showing → hide it, go immersive
+    hideToolbar();
+    if (currentBook) enterFullscreen();
+  } else {
+    // Toolbar hidden, not fullscreen → go immersive
+    if (currentBook) enterFullscreen();
   }
 });
 
