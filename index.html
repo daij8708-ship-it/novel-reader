@@ -1089,12 +1089,32 @@ function isFullscreen() {
 
 function enterFullscreen() {
   setThemeColor();
+  var opts = { navigationUI: 'hide' };
   var el = document.documentElement;
-  (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+  // Try multiple entry points — some browsers only support one
+  var fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (fn) {
+    try {
+      var p = fn.call(el, opts);
+      if (p && p.catch) p.catch(function() {
+        // Fallback: try on body
+        var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
+        if (fb) fb.call(document.body, opts).catch(function(){});
+      });
+    } catch(e) {
+      // Try body
+      var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
+      if (fb) try { fb.call(document.body, opts); } catch(e2) {}
+    }
+  } else {
+    // Browser doesn't have Fullscreen API at all
+    showToast('💡 把页面添加到桌面可隐藏浏览器栏');
+  }
 }
 
 function exitFullscreen() {
-  (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+  var fn = document.exitFullscreen || document.webkitExitFullscreen;
+  if (fn) { try { fn.call(document); } catch(e) {} }
 }
 
 function showToolbar() {
@@ -1138,14 +1158,25 @@ readerContainer.addEventListener('scroll', function() {
   if (distFromBottom < 300) appendNextChapter();
 }, { passive: true });
 
-// Tap middle → cycle: show-toolbar → immersive-fullscreen → show-toolbar → ...
-readerContainer.addEventListener('click', function(e) {
+// Tap/click handler shared between click and touchend to toggle fullscreen
+var tapTimer = null;
+function handleReaderTap(e) {
+  // Debounce: ignore synthetic click that follows a handled touchend
+  if (e.type === 'click' && tapTimer) { tapTimer = null; return; }
+
   if (e.target.closest('button,a,label,input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
 
   var rect = readerContainer.getBoundingClientRect();
-  var clickY = e.clientY - rect.top;
-  if (clickY < rect.height * 0.1 || clickY > rect.height * 0.9) return;
+  var y = (e.touches ? e.changedTouches[0].clientY : e.clientY) - rect.top;
+  if (y < rect.height * 0.1 || y > rect.height * 0.9) return;
+
+  if (e.type === 'touchend') {
+    // Mark we handled this tap so the synthetic click is skipped
+    tapTimer = setTimeout(function() { tapTimer = null; }, 400);
+  }
+
+  e.preventDefault();
 
   if (isFullscreen()) {
     // Currently immersive → exit, show toolbar
@@ -1159,7 +1190,10 @@ readerContainer.addEventListener('click', function(e) {
     // Toolbar hidden, not fullscreen → go immersive
     if (currentBook) enterFullscreen();
   }
-});
+}
+
+readerContainer.addEventListener('touchend', handleReaderTap, { passive: false });
+readerContainer.addEventListener('click', handleReaderTap);
 
 function showBottomNav() {}
 function hideBottomNav() {}
