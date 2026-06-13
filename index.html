@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="x5-fullscreen" content="true">
+<meta name="full-screen" content="yes">
+<meta name="browsermode" content="application">
 <meta name="theme-color" content="#f5f0e8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
@@ -1091,24 +1094,35 @@ function enterFullscreen() {
   setThemeColor();
   var opts = { navigationUI: 'hide' };
   var el = document.documentElement;
-  // Try multiple entry points — some browsers only support one
   var fn = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (fn) {
-    try {
-      var p = fn.call(el, opts);
-      if (p && p.catch) p.catch(function() {
-        // Fallback: try on body
-        var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
-        if (fb) fb.call(document.body, opts).catch(function(){});
+
+  if (!fn) {
+    // Try body as fallback (some Chinese browsers only support body)
+    el = document.body;
+    fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  }
+  if (!fn) {
+    showToast('💡 添加到桌面可隐藏浏览器栏');
+    return;
+  }
+
+  try {
+    var p = fn.call(el, opts);
+    if (p && p.catch) {
+      p.catch(function() {
+        // Fullscreen rejected — try body if we tried root first
+        if (el === document.documentElement) {
+          var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
+          if (fb) fb.call(document.body, opts).catch(function() {
+            showToast('💡 添加到桌面可隐藏浏览器栏');
+          });
+        } else {
+          showToast('💡 添加到桌面可隐藏浏览器栏');
+        }
       });
-    } catch(e) {
-      // Try body
-      var fb = document.body.requestFullscreen || document.body.webkitRequestFullscreen;
-      if (fb) try { fb.call(document.body, opts); } catch(e2) {}
     }
-  } else {
-    // Browser doesn't have Fullscreen API at all
-    showToast('💡 把页面添加到桌面可隐藏浏览器栏');
+  } catch(e) {
+    showToast('💡 添加到桌面可隐藏浏览器栏');
   }
 }
 
@@ -1158,42 +1172,31 @@ readerContainer.addEventListener('scroll', function() {
   if (distFromBottom < 300) appendNextChapter();
 }, { passive: true });
 
-// Tap/click handler shared between click and touchend to toggle fullscreen
-var tapTimer = null;
-function handleReaderTap(e) {
-  // Debounce: ignore synthetic click that follows a handled touchend
-  if (e.type === 'click' && tapTimer) { tapTimer = null; return; }
-
+// Tap middle of screen → toggle between toolbar mode and immersive fullscreen
+readerContainer.addEventListener('click', function(e) {
   if (e.target.closest('button,a,label,input')) return;
   if (window.getSelection().toString().trim().length > 0) return;
 
   var rect = readerContainer.getBoundingClientRect();
-  var y = (e.touches ? e.changedTouches[0].clientY : e.clientY) - rect.top;
+  var y = e.clientY - rect.top;
   if (y < rect.height * 0.1 || y > rect.height * 0.9) return;
 
-  if (e.type === 'touchend') {
-    // Mark we handled this tap so the synthetic click is skipped
-    tapTimer = setTimeout(function() { tapTimer = null; }, 400);
-  }
-
-  e.preventDefault();
-
   if (isFullscreen()) {
-    // Currently immersive → exit, show toolbar
+    // In fullscreen → exit, show toolbar
     exitFullscreen();
     showToolbar();
-  } else if (toolbarVisible) {
-    // Toolbar showing → hide it, go immersive
+  } else if (toolbarVisible && currentBook) {
+    // Toolbar showing → hide it, go fullscreen
     hideToolbar();
-    if (currentBook) enterFullscreen();
+    enterFullscreen();
+  } else if (!toolbarVisible && currentBook) {
+    // Toolbar hidden → go fullscreen
+    enterFullscreen();
   } else {
-    // Toolbar hidden, not fullscreen → go immersive
-    if (currentBook) enterFullscreen();
+    // No book loaded → just toggle toolbar
+    if (toolbarVisible) hideToolbar(); else showToolbar();
   }
-}
-
-readerContainer.addEventListener('touchend', handleReaderTap, { passive: false });
-readerContainer.addEventListener('click', handleReaderTap);
+});
 
 function showBottomNav() {}
 function hideBottomNav() {}
